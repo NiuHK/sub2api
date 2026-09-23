@@ -533,7 +533,7 @@
           </p>
         </fieldset>
 
-        <div>
+        <div v-if="!formData.group_bindings_enabled">
           <label class="input-label" for="key-form-group">{{ t('keys.groupLabel') }}</label>
           <Select
             :key="showEditModal ? 'edit' : createProvider"
@@ -579,6 +579,31 @@
             </template>
           </Select>
         </div>
+
+        <section class="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-dark-600" aria-labelledby="key-group-bindings-label">
+          <label id="key-group-bindings-label" class="flex items-center gap-2 text-sm font-medium">
+            <input :checked="formData.group_bindings_enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="setGroupBindingsEnabled(($event.target as HTMLInputElement).checked)" />
+            {{ t('keys.groupBindings.toggle') }}
+          </label>
+          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.groupBindings.hint') }}</p>
+          <div v-if="formData.group_bindings_enabled" class="space-y-2">
+            <div v-for="group in eligibleBindingGroups" :key="group.id" class="flex flex-wrap items-center gap-3">
+              <label class="flex min-w-0 flex-1 items-center gap-2 text-sm">
+                <input type="checkbox" :checked="hasGroupBinding(group.id)" @change="toggleGroupBinding(group.id, ($event.target as HTMLInputElement).checked)" />
+                <span>{{ group.name }}</span>
+              </label>
+              <label class="flex items-center gap-1 text-xs">
+                <span>{{ t('keys.groupBindings.priority') }}</span>
+                <input v-if="hasGroupBinding(group.id)" type="number" min="1" :value="bindingPriority(group.id)" class="input w-20" :aria-label="t('keys.groupBindings.priorityFor', { group: group.name })" @change="setBindingPriority(group.id, Number(($event.target as HTMLInputElement).value))" />
+              </label>
+              <label v-if="hasGroupBinding(group.id)" class="flex items-center gap-1 text-xs">
+                <span>{{ t('keys.groupBindings.cooldown') }}</span>
+                <input type="number" min="0" :value="bindingCooldown(group.id)" class="input w-24" :aria-label="t('keys.groupBindings.cooldownFor', { group: group.name })" @change="setBindingCooldown(group.id, Number(($event.target as HTMLInputElement).value))" />
+              </label>
+            </div>
+            <p v-if="!eligibleBindingGroups.length" class="text-xs text-gray-500">{{ t('keys.groupBindings.noGroups') }}</p>
+          </div>
+        </section>
 
         <!-- Custom Key Section (only for create) -->
         <div v-if="!showEditModal" class="space-y-3">
@@ -1222,7 +1247,7 @@ import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-	import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'
+	import type { ApiKey, ApiKeyGroupBinding, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
@@ -1430,6 +1455,8 @@ const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance 
 const formData = ref({
   name: '',
   group_id: null as number | null,
+  group_bindings_enabled: false,
+  group_bindings: [] as ApiKeyGroupBinding[],
   status: 'active' as 'active' | 'inactive',
   use_custom_key: false,
   custom_key: '',
@@ -1536,6 +1563,32 @@ const formGroupOptions = computed(() => showEditModal.value
   ? groupOptions.value
   : groupOptions.value.filter((group) => getKeyGroupProvider(group.platform) === createProvider.value)
 )
+const eligibleBindingGroups = computed(() => groups.value.filter((group) => group.platform === 'openai' && group.subscription_type === 'subscription' && group.status === 'active'))
+const hasGroupBinding = (groupId: number) => formData.value.group_bindings.some((binding) => binding.group_id === groupId)
+const bindingPriority = (groupId: number) => formData.value.group_bindings.find((binding) => binding.group_id === groupId)?.priority ?? 1
+const bindingCooldown = (groupId: number) => formData.value.group_bindings.find((binding) => binding.group_id === groupId)?.cooldown_seconds ?? 0
+const toggleGroupBinding = (groupId: number, enabled: boolean) => {
+  if (enabled && !hasGroupBinding(groupId)) formData.value.group_bindings.push({ group_id: groupId, priority: formData.value.group_bindings.length + 1, cooldown_seconds: 0 })
+  if (!enabled) formData.value.group_bindings = formData.value.group_bindings.filter((binding) => binding.group_id !== groupId)
+  formData.value.group_bindings.sort((a, b) => a.priority - b.priority)
+  formData.value.group_bindings = formData.value.group_bindings.map((binding, index) => ({ ...binding, priority: index + 1 }))
+}
+const setBindingPriority = (groupId: number, priority: number) => {
+  const bindings = [...formData.value.group_bindings].sort((a, b) => a.priority - b.priority)
+  const currentIndex = bindings.findIndex((binding) => binding.group_id === groupId)
+  if (currentIndex < 0 || !Number.isFinite(priority)) return
+  const [binding] = bindings.splice(currentIndex, 1)
+  bindings.splice(Math.max(0, Math.min(bindings.length, Math.trunc(priority) - 1)), 0, binding)
+  formData.value.group_bindings = bindings.map((item, index) => ({ ...item, priority: index + 1 }))
+}
+const setGroupBindingsEnabled = (enabled: boolean) => {
+  formData.value.group_bindings_enabled = enabled
+  if (!enabled) formData.value.group_bindings = []
+}
+const setBindingCooldown = (groupId: number, cooldown: number) => {
+  const binding = formData.value.group_bindings.find((item) => item.group_id === groupId)
+  if (binding && Number.isFinite(cooldown) && cooldown >= 0) binding.cooldown_seconds = cooldown
+}
 
 const selectCreateProvider = (provider: KeyGroupProvider) => {
   if (createProvider.value === provider) return
@@ -1698,6 +1751,8 @@ const editKey = (key: ApiKey) => {
   formData.value = {
     name: key.name,
     group_id: key.group_id,
+    group_bindings_enabled: key.group_bindings_enabled ?? false,
+    group_bindings: key.group_bindings_enabled ? (key.group_bindings ?? []).map((binding) => ({ ...binding })) : [],
     status: key.status === 'quota_exhausted' || key.status === 'expired' ? 'inactive' : key.status,
     use_custom_key: false,
     custom_key: '',
@@ -1796,8 +1851,16 @@ const confirmDelete = (key: ApiKey) => {
 }
 
 const handleSubmit = async () => {
-  // Validate group_id is required
-  if (formData.value.group_id === null) {
+  const bindings = formData.value.group_bindings_enabled
+    ? [...formData.value.group_bindings].sort((a, b) => a.priority - b.priority)
+    : []
+  if (formData.value.group_bindings_enabled && bindings.length === 0) {
+    appStore.showError(t('keys.groupBindings.required'))
+    return
+  }
+  const groupId = formData.value.group_bindings_enabled ? bindings[0].group_id : formData.value.group_id
+  // Validate the legacy group selection when multi-group bindings are disabled.
+  if (groupId === null) {
     appStore.showError(t('keys.groupRequired'))
     return
   }
@@ -1854,7 +1917,7 @@ const handleSubmit = async () => {
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
-        group_id: formData.value.group_id,
+        group_id: groupId,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
         quota: quota,
@@ -1862,6 +1925,8 @@ const handleSubmit = async () => {
         rate_limit_5h: rateLimitData.rate_limit_5h,
         rate_limit_1d: rateLimitData.rate_limit_1d,
         rate_limit_7d: rateLimitData.rate_limit_7d,
+        group_bindings_enabled: formData.value.group_bindings_enabled,
+        group_bindings: bindings,
       }
       if (shouldSubmitEditStatus(selectedKey.value, formData.value.status)) {
         updates.status = formData.value.status
@@ -1872,13 +1937,14 @@ const handleSubmit = async () => {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
       await keysAPI.create(
         formData.value.name,
-        formData.value.group_id,
+        groupId,
         customKey,
         ipWhitelist,
         ipBlacklist,
         quota,
         expiresInDays,
-        rateLimitData
+        rateLimitData,
+        { enabled: formData.value.group_bindings_enabled, bindings }
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
@@ -1924,6 +1990,8 @@ const closeModals = () => {
   formData.value = {
     name: '',
     group_id: null,
+    group_bindings_enabled: false,
+    group_bindings: [],
     status: 'active',
     use_custom_key: false,
     custom_key: '',

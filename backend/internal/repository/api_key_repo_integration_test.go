@@ -9,6 +9,7 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
@@ -123,6 +124,37 @@ func (s *APIKeyRepoSuite) TestGetByKeyForAuth_PreservesMessagesDispatchModelConf
 	s.Require().Equal("gpt-5.4", got.Group.DefaultMappedModel)
 	s.Require().Equal("gpt-5.4-nano", got.Group.MessagesDispatchModelConfig.OpusMappedModel)
 	s.Require().Equal("gpt-5.4-nano", got.Group.MessagesDispatchModelConfig.ExactModelMappings["claude-sonnet-4.5"])
+}
+
+func (s *APIKeyRepoSuite) TestEnabledGroupBindingsPersistenceAndAuthProjection() {
+	user := s.mustCreateUser("bindings@test.com")
+	first := s.mustCreateGroup("bindings-first")
+	second := s.mustCreateGroup("bindings-second")
+	bindings := []domain.APIKeyGroupBinding{{GroupID: first.ID, Priority: 0, CooldownSeconds: 5}, {GroupID: second.ID, Priority: 1, CooldownSeconds: 60}}
+	key := &service.APIKey{UserID: user.ID, Key: "sk-bindings", Name: "Bindings", Status: service.StatusActive, GroupID: &first.ID, GroupBindingsEnabled: true, GroupBindings: bindings}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+	for _, load := range []func(context.Context) (*service.APIKey, error){
+		func(ctx context.Context) (*service.APIKey, error) { return s.repo.GetByID(ctx, key.ID) },
+		func(ctx context.Context) (*service.APIKey, error) { return s.repo.GetByKeyForAuth(ctx, key.Key) },
+	} {
+		got, err := load(s.ctx)
+		s.Require().NoError(err)
+		s.Require().True(got.GroupBindingsEnabled)
+		s.Require().Equal(bindings, got.GroupBindings)
+	}
+	keys, err := s.repo.ListEnabledBindingKeysByGroupID(s.ctx, second.ID)
+	s.Require().NoError(err)
+	s.Require().Equal([]string{key.Key}, keys)
+	keys, err = s.repo.ListKeysByGroupID(s.ctx, second.ID)
+	s.Require().NoError(err)
+	s.Require().Equal([]string{key.Key}, keys)
+	key.GroupBindingsEnabled = false
+	key.GroupBindings = nil
+	s.Require().NoError(s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{GroupBindings: true}))
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.Require().False(got.GroupBindingsEnabled)
+	s.Require().Empty(got.GroupBindings)
 }
 
 // --- Update ---

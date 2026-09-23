@@ -509,6 +509,14 @@ type OpenAIGatewayService struct {
 	openaiCodexTurnStateWrites  atomic.Uint64
 }
 
+// GetGroupByID resolves a group through the repository-backed scheduler snapshot service.
+func (s *OpenAIGatewayService) GetGroupByID(ctx context.Context, groupID int64) (*Group, error) {
+	if s == nil || s.schedulerSnapshot == nil || groupID <= 0 {
+		return nil, nil
+	}
+	return s.schedulerSnapshot.GetGroupByID(ctx, groupID)
+}
+
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
 func NewOpenAIGatewayService(
 	accountRepo AccountRepository,

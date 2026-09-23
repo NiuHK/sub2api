@@ -726,7 +726,15 @@ export interface CompositeRouteDecision {
   reason?: string
 }
 
+export interface ApiKeyGroupBinding {
+  group_id: number
+  priority: number
+  cooldown_seconds: number
+}
+
 export interface ApiKey {
+  group_bindings_enabled?: boolean
+  group_bindings?: ApiKeyGroupBinding[]
   id: number
   user_id: number
   key: string
@@ -761,6 +769,8 @@ export interface ApiKey {
 export interface CreateApiKeyRequest {
   name: string
   group_id?: number | null
+  group_bindings_enabled?: boolean
+  group_bindings?: ApiKeyGroupBinding[]
   custom_key?: string // Optional custom API Key
   ip_whitelist?: string[]
   ip_blacklist?: string[]
@@ -774,6 +784,8 @@ export interface CreateApiKeyRequest {
 export interface UpdateApiKeyRequest {
   name?: string
   group_id?: number | null
+  group_bindings_enabled?: boolean
+  group_bindings?: ApiKeyGroupBinding[]
   status?: 'active' | 'inactive'
   ip_whitelist?: string[]
   ip_blacklist?: string[]

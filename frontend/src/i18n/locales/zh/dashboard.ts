@@ -116,6 +116,16 @@ export default {
     nameLabel: '名称',
     namePlaceholder: '我的 API 密钥',
     groupLabel: '分组',
+    groupBindings: {
+      toggle: '启用多分组故障切换',
+      hint: '按优先级升序尝试 OpenAI 订阅分组；冷却时间按分组设置，单位为秒。',
+      priority: '优先级',
+      cooldown: '冷却（秒）',
+      priorityFor: '{group} 的优先级',
+      cooldownFor: '{group} 的冷却秒数',
+      noGroups: '没有可用的 OpenAI 订阅分组。',
+      required: '启用多分组故障切换时，至少选择一个分组。'
+    },
     providerLabel: '厂商',
     providers: {
       anthropic: 'Anthropic',

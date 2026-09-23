@@ -157,11 +157,14 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			AbortWithError(c, 401, "USER_INACTIVE", "User account is not active")
 			return
 		}
-		if abortIfAPIKeyGroupUnavailable(c, apiKey) {
-			return
-		}
-		if abortIfAPIKeyGroupNotAllowed(c, apiKey) {
-			return
+		deferPrimaryGroupValidation := shouldDeferPrimaryGroupValidation(apiKey, c.Request.Method, c.Request.URL.Path)
+		if !deferPrimaryGroupValidation {
+			if abortIfAPIKeyGroupUnavailable(c, apiKey) {
+				return
+			}
+			if abortIfAPIKeyGroupNotAllowed(c, apiKey) {
+				return
+			}
 		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
 		c.Request = c.Request.WithContext(ctx)
@@ -194,7 +197,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 
 		// 倍率自省不需要订阅数据；/v1/usage 仍保留原有订阅读取行为。
-		if isSubscriptionType && subscriptionService != nil && !billingInfoRequest {
+		if isSubscriptionType && subscriptionService != nil && !billingInfoRequest && !deferPrimaryGroupValidation {
 			sub, subErr := subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
@@ -258,7 +261,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 					AbortWithError(c, status, code, validateErr.Error())
 					return
 				}
-			} else {
+			} else if !deferPrimaryGroupValidation || !isSubscriptionType {
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
 				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
@@ -331,6 +334,26 @@ func isOpenAICompatibleAPIKeyRequest(c *gin.Context) bool {
 		}
 	}
 	return false
+}
+
+func shouldDeferPrimaryGroupValidation(apiKey *service.APIKey, method, path string) bool {
+	return apiKey != nil && apiKey.GroupBindingsEnabled && apiKey.Group != nil &&
+		apiKey.Group.Platform == service.PlatformOpenAI && apiKey.Group.IsSubscriptionType() &&
+		isMultiGroupAPIKeyEndpoint(method, path)
+}
+
+func isMultiGroupAPIKeyEndpoint(method, path string) bool {
+	if method != http.MethodPost {
+		return false
+	}
+	switch path {
+	case "/v1/chat/completions", "/chat/completions":
+		return true
+	case "/v1/responses", "/responses", "/backend-api/codex/responses":
+		return true
+	default:
+		return false
+	}
 }
 
 func isAsyncImageTaskRead(method, path string) bool {

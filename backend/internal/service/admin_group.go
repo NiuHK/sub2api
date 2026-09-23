@@ -757,6 +757,11 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		normalizeUpdateGroupInputForSimpleMode(input)
 	}
 
+	if input.Platform != "" && input.Platform != group.Platform {
+		if err := s.rejectEnabledBindingGroupMutation(ctx, id); err != nil {
+			return nil, err
+		}
+	}
 	// 渠道缓存里存了 groupID → platform 的映射，改了平台要让它失效（见函数末尾）
 	previousPlatform := group.Platform
 
@@ -1168,7 +1173,29 @@ func (s *adminServiceImpl) DeleteGroupIfEmpty(ctx context.Context, id int64) err
 	return s.deleteGroup(ctx, id, true)
 }
 
+type enabledBindingGroupKeyLister interface {
+	ListEnabledBindingKeysByGroupID(context.Context, int64) ([]string, error)
+}
+
+func (s *adminServiceImpl) rejectEnabledBindingGroupMutation(ctx context.Context, groupID int64) error {
+	lister, ok := s.apiKeyRepo.(enabledBindingGroupKeyLister)
+	if !ok {
+		return nil // legacy repository implementations have no bindings
+	}
+	keys, err := lister.ListEnabledBindingKeysByGroupID(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if len(keys) > 0 {
+		return infraerrors.BadRequest("GROUP_HAS_KEY_BINDINGS", "edit enabled API key bindings before changing this group")
+	}
+	return nil
+}
+
 func (s *adminServiceImpl) deleteGroup(ctx context.Context, id int64, requireEmpty bool) error {
+	if err := s.rejectEnabledBindingGroupMutation(ctx, id); err != nil {
+		return err
+	}
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		group, err := s.groupRepo.GetByIDLite(ctx, id)
 		if err != nil {
@@ -1464,6 +1491,9 @@ func (s *adminServiceImpl) ReplaceUserGroup(ctx context.Context, userID, oldGrou
 		return nil, infraerrors.BadRequest("GROUP_IS_SUBSCRIPTION", "subscription groups are not supported for replacement")
 	}
 
+	if err := s.rejectEnabledBindingGroupMutation(ctx, oldGroupID); err != nil {
+		return nil, err
+	}
 	// 事务保证原子性
 	if s.entClient == nil {
 		return nil, fmt.Errorf("entClient is nil, cannot perform group replacement")

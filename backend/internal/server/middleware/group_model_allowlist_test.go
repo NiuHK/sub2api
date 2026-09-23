@@ -78,6 +78,55 @@ func (b *readTrackingBody) Read(p []byte) (int, error) {
 
 func (b *readTrackingBody) Close() error { return nil }
 
+func TestGroupModelAllowlistDefersBoundOpenAIEndpointsOnly(t *testing.T) {
+	for _, tt := range []struct {
+		name            string
+		path            string
+		bindingsEnabled bool
+		platform         string
+		subscriptionType string
+		wantStatus       int
+	}{
+		{name: "enabled bindings chat", path: "/v1/chat/completions", bindingsEnabled: true, platform: service.PlatformOpenAI, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusOK},
+		{name: "enabled bindings responses", path: "/v1/responses", bindingsEnabled: true, platform: service.PlatformOpenAI, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusOK},
+		{name: "legacy key chat", path: "/v1/chat/completions", platform: service.PlatformOpenAI, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusNotFound},
+		{name: "other endpoint", path: "/v1/embeddings", bindingsEnabled: true, platform: service.PlatformOpenAI, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusNotFound},
+		{name: "non-openai group", path: "/v1/chat/completions", bindingsEnabled: true, platform: service.PlatformAnthropic, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusNotFound},
+		{name: "non-subscription group", path: "/v1/chat/completions", bindingsEnabled: true, platform: service.PlatformOpenAI, wantStatus: http.StatusNotFound},
+		{name: "responses subpath", path: "/v1/responses/input_tokens", bindingsEnabled: true, platform: service.PlatformOpenAI, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusNotFound},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			router := gin.New()
+			apiKey := &service.APIKey{
+				GroupBindingsEnabled: tt.bindingsEnabled,
+				Group: &service.Group{
+					Platform:         tt.platform,
+					SubscriptionType: tt.subscriptionType,
+					ModelAllowlist: service.GroupModelAllowlist{
+						Enabled: true,
+						Models:  []string{"allowed-model"},
+					},
+				},
+			}
+			router.Use(func(c *gin.Context) {
+				c.Set(string(ContextKeyAPIKey), apiKey)
+				c.Next()
+			})
+			router.Use(GroupModelAllowlist())
+			router.POST("/v1/chat/completions", func(c *gin.Context) { c.Status(http.StatusOK) })
+			router.POST("/v1/responses", func(c *gin.Context) { c.Status(http.StatusOK) })
+			router.POST("/v1/embeddings", func(c *gin.Context) { c.Status(http.StatusOK) })
+			router.POST("/v1/responses/input_tokens", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+			w := doJSON(t, router, http.MethodPost, tt.path, `{"model":"blocked-model"}`)
+			if w.Code != tt.wantStatus {
+				t.Fatalf("expected %d, got %d: %s", tt.wantStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestGroupModelAllowlistDisabledDoesNotReadBody(t *testing.T) {
 	router, calls := newGroupModelAllowlistTestRouter(allowlistAPIKey(false, "claude-sonnet-4.5"), "/v1")
 

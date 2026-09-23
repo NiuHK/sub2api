@@ -114,6 +114,8 @@ const createApiKey = (): ApiKey => ({
   key: 'sk-test-key',
   name: 'test-key',
   group_id: null,
+  group_bindings_enabled: false,
+  group_bindings: [],
   status: 'active',
   ip_whitelist: [],
   ip_blacklist: [],
@@ -568,6 +570,89 @@ describe('user KeysView column settings', () => {
 
     beforeEach(() => {
       getAvailableGroups.mockResolvedValue(availableGroups)
+    })
+
+    it('shows bindings only for active OpenAI subscription groups and submits them with the key', async () => {
+      getAvailableGroups.mockResolvedValue([
+        { ...availableGroups[1], subscription_type: 'subscription', status: 'active' },
+        { ...availableGroups[0], id: 90, subscription_type: 'subscription', status: 'active' },
+        { ...availableGroups[1], id: 91, subscription_type: 'standard', status: 'active' },
+      ])
+      const wrapper = await openCreate()
+      const toggle = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('keys.groupBindings.toggle'))
+      expect(toggle).toBeDefined()
+      await toggle!.setValue(true)
+      expect(wrapper.text()).toContain('Shared group 2')
+      expect(wrapper.text()).toContain('Shared group 90')
+      expect(wrapper.text()).not.toContain('Shared group 91')
+    })
+
+    it('requires a binding and submits the lowest-priority binding as the legacy group', async () => {
+      const eligible = [
+        { ...availableGroups[1], id: 30, subscription_type: 'subscription', status: 'active' },
+        { ...availableGroups[1], id: 31, subscription_type: 'subscription', status: 'active' },
+      ]
+      getAvailableGroups.mockResolvedValue([...availableGroups, ...eligible])
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Failover key')
+      await chooseProvider(wrapper, 'openai')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 2)
+      const enable = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('keys.groupBindings.toggle'))!
+      await enable.setValue(true)
+      expect(wrapper.find('[data-tour="key-form-group"]').exists()).toBe(false)
+      await wrapper.get('#key-form').trigger('submit')
+      expect(showError).toHaveBeenCalledWith('keys.groupBindings.required')
+      expect(keysAPI.create).not.toHaveBeenCalled()
+
+      const bindingCheckboxes = wrapper.findAll('input[type="checkbox"]').filter((input) => input.element.parentElement?.textContent?.match(/Shared group 30|Shared group 31/))
+      await bindingCheckboxes[0].setValue(true)
+      await bindingCheckboxes[1].setValue(true)
+      const priorities = wrapper.findAll('input[type="number"]').filter((input) => input.attributes('aria-label')?.startsWith('keys.groupBindings.priorityFor'))
+      await priorities[1].setValue(1)
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      const args = vi.mocked(keysAPI.create).mock.calls[0]
+      expect(args[1]).toBe(31)
+      expect(args[8]).toEqual({ enabled: true, bindings: [
+        { group_id: 31, priority: 1, cooldown_seconds: 0 },
+        { group_id: 30, priority: 2, cooldown_seconds: 0 },
+      ] })
+    })
+
+    it('clears stale bindings when editing a key whose multi-group mode is disabled', async () => {
+      listKeys.mockResolvedValue({
+        items: [{ ...createApiKey(), group_id: 2, group_bindings_enabled: false, group_bindings: [{ group_id: 30, priority: 1, cooldown_seconds: 20 }] }],
+        total: 1, page: 1, page_size: 20, pages: 1,
+      })
+      updateKey.mockResolvedValue(createApiKey())
+      const wrapper = await mountView()
+      await getButtonByText(wrapper, 'common.edit').trigger('click')
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
+        group_bindings_enabled: false,
+        group_bindings: [],
+      }))
+    })
+
+    it('clears bindings when multi-group mode is turned off', async () => {
+      getAvailableGroups.mockResolvedValue([
+        ...availableGroups,
+        { ...availableGroups[1], id: 30, subscription_type: 'subscription', status: 'active' },
+      ])
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Legacy key')
+      await chooseProvider(wrapper, 'openai')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 2)
+      const enable = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('keys.groupBindings.toggle'))!
+      await enable.setValue(true)
+      const groupCheckbox = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('Shared group 30'))!
+      await groupCheckbox.setValue(true)
+      await enable.setValue(false)
+      vi.mocked(keysAPI.create).mockResolvedValue(createApiKey())
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(vi.mocked(keysAPI.create).mock.calls[0][8]).toEqual({ enabled: false, bindings: [] })
     })
 
     it('classifies all configured platforms and retains the complete table filter', async () => {

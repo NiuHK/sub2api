@@ -21,6 +21,70 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestShouldDeferPrimaryGroupValidation(t *testing.T) {
+	multi := &service.APIKey{
+		GroupBindingsEnabled: true,
+		Group: &service.Group{
+			Platform:         service.PlatformOpenAI,
+			SubscriptionType: service.SubscriptionTypeSubscription,
+		},
+	}
+	legacy := &service.APIKey{Group: multi.Group}
+	nonOpenAI := &service.APIKey{
+		GroupBindingsEnabled: true,
+		Group: &service.Group{
+			Platform:         service.PlatformAnthropic,
+			SubscriptionType: service.SubscriptionTypeSubscription,
+		},
+	}
+	nonSubscription := &service.APIKey{
+		GroupBindingsEnabled: true,
+		Group: &service.Group{Platform: service.PlatformOpenAI},
+	}
+	for _, tt := range []struct {
+		name string
+		key  *service.APIKey
+		path string
+		want bool
+	}{
+		{name: "enabled binding key endpoint", key: multi, path: "/v1/chat/completions", want: true},
+		{name: "legacy key endpoint", key: legacy, path: "/v1/chat/completions", want: false},
+		{name: "non-openai group", key: nonOpenAI, path: "/v1/chat/completions", want: false},
+		{name: "non-subscription group", key: nonSubscription, path: "/v1/chat/completions", want: false},
+		{name: "enabled binding key other endpoint", key: multi, path: "/v1/embeddings", want: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, shouldDeferPrimaryGroupValidation(tt.key, http.MethodPost, tt.path))
+		})
+	}
+}
+
+func TestIsMultiGroupAPIKeyEndpoint(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		method string
+		path   string
+		want   bool
+	}{
+		{name: "v1 chat completions", method: http.MethodPost, path: "/v1/chat/completions", want: true},
+		{name: "root chat completions alias", method: http.MethodPost, path: "/chat/completions", want: true},
+		{name: "v1 responses", method: http.MethodPost, path: "/v1/responses", want: true},
+		{name: "root responses alias", method: http.MethodPost, path: "/responses", want: true},
+		{name: "codex responses alias", method: http.MethodPost, path: "/backend-api/codex/responses", want: true},
+		{name: "v1 responses input tokens subpath", method: http.MethodPost, path: "/v1/responses/input_tokens", want: false},
+		{name: "root responses subpath", method: http.MethodPost, path: "/responses/input_tokens", want: false},
+		{name: "codex responses subpath", method: http.MethodPost, path: "/backend-api/codex/responses/input_tokens", want: false},
+		{name: "wrong method", method: http.MethodGet, path: "/v1/responses", want: false},
+		{name: "chat subpath", method: http.MethodPost, path: "/v1/chat/completions/extra", want: false},
+		{name: "other endpoint", method: http.MethodPost, path: "/v1/embeddings", want: false},
+		{name: "near-match prefix", method: http.MethodPost, path: "/v1/responses-extra", want: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isMultiGroupAPIKeyEndpoint(tt.method, tt.path))
+		})
+	}
+}
+
 func TestAPIKeyAuthRejectsOversizedCredentialsBeforeLookup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	var calls atomic.Int32

@@ -108,51 +108,54 @@ const (
 // APIKeyMutation represents an operation that mutates the APIKey nodes in the graph.
 type APIKeyMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int64
-	created_at         *time.Time
-	updated_at         *time.Time
-	deleted_at         *time.Time
-	key                *string
-	name               *string
-	status             *string
-	last_used_at       *time.Time
-	ip_whitelist       *[]string
-	appendip_whitelist []string
-	ip_blacklist       *[]string
-	appendip_blacklist []string
-	quota              *float64
-	addquota           *float64
-	quota_used         *float64
-	addquota_used      *float64
-	expires_at         *time.Time
-	rate_limit_5h      *float64
-	addrate_limit_5h   *float64
-	rate_limit_1d      *float64
-	addrate_limit_1d   *float64
-	rate_limit_7d      *float64
-	addrate_limit_7d   *float64
-	usage_5h           *float64
-	addusage_5h        *float64
-	usage_1d           *float64
-	addusage_1d        *float64
-	usage_7d           *float64
-	addusage_7d        *float64
-	window_5h_start    *time.Time
-	window_1d_start    *time.Time
-	window_7d_start    *time.Time
-	clearedFields      map[string]struct{}
-	user               *int64
-	cleareduser        bool
-	group              *int64
-	clearedgroup       bool
-	usage_logs         map[int64]struct{}
-	removedusage_logs  map[int64]struct{}
-	clearedusage_logs  bool
-	done               bool
-	oldValue           func(context.Context) (*APIKey, error)
-	predicates         []predicate.APIKey
+	op                     Op
+	typ                    string
+	id                     *int64
+	created_at             *time.Time
+	updated_at             *time.Time
+	deleted_at             *time.Time
+	key                    *string
+	name                   *string
+	group_bindings_enabled *bool
+	group_bindings         *[]domain.APIKeyGroupBinding
+	appendgroup_bindings   []domain.APIKeyGroupBinding
+	status                 *string
+	last_used_at           *time.Time
+	ip_whitelist           *[]string
+	appendip_whitelist     []string
+	ip_blacklist           *[]string
+	appendip_blacklist     []string
+	quota                  *float64
+	addquota               *float64
+	quota_used             *float64
+	addquota_used          *float64
+	expires_at             *time.Time
+	rate_limit_5h          *float64
+	addrate_limit_5h       *float64
+	rate_limit_1d          *float64
+	addrate_limit_1d       *float64
+	rate_limit_7d          *float64
+	addrate_limit_7d       *float64
+	usage_5h               *float64
+	addusage_5h            *float64
+	usage_1d               *float64
+	addusage_1d            *float64
+	usage_7d               *float64
+	addusage_7d            *float64
+	window_5h_start        *time.Time
+	window_1d_start        *time.Time
+	window_7d_start        *time.Time
+	clearedFields          map[string]struct{}
+	user                   *int64
+	cleareduser            bool
+	group                  *int64
+	clearedgroup           bool
+	usage_logs             map[int64]struct{}
+	removedusage_logs      map[int64]struct{}
+	clearedusage_logs      bool
+	done                   bool
+	oldValue               func(context.Context) (*APIKey, error)
+	predicates             []predicate.APIKey
 }
 
 var _ ent.Mutation = (*APIKeyMutation)(nil)
@@ -529,6 +532,93 @@ func (m *APIKeyMutation) GroupIDCleared() bool {
 func (m *APIKeyMutation) ResetGroupID() {
 	m.group = nil
 	delete(m.clearedFields, apikey.FieldGroupID)
+}
+
+// SetGroupBindingsEnabled sets the "group_bindings_enabled" field.
+func (m *APIKeyMutation) SetGroupBindingsEnabled(b bool) {
+	m.group_bindings_enabled = &b
+}
+
+// GroupBindingsEnabled returns the value of the "group_bindings_enabled" field in the mutation.
+func (m *APIKeyMutation) GroupBindingsEnabled() (r bool, exists bool) {
+	v := m.group_bindings_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupBindingsEnabled returns the old "group_bindings_enabled" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldGroupBindingsEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupBindingsEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupBindingsEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupBindingsEnabled: %w", err)
+	}
+	return oldValue.GroupBindingsEnabled, nil
+}
+
+// ResetGroupBindingsEnabled resets all changes to the "group_bindings_enabled" field.
+func (m *APIKeyMutation) ResetGroupBindingsEnabled() {
+	m.group_bindings_enabled = nil
+}
+
+// SetGroupBindings sets the "group_bindings" field.
+func (m *APIKeyMutation) SetGroupBindings(dkgb []domain.APIKeyGroupBinding) {
+	m.group_bindings = &dkgb
+	m.appendgroup_bindings = nil
+}
+
+// GroupBindings returns the value of the "group_bindings" field in the mutation.
+func (m *APIKeyMutation) GroupBindings() (r []domain.APIKeyGroupBinding, exists bool) {
+	v := m.group_bindings
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupBindings returns the old "group_bindings" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldGroupBindings(ctx context.Context) (v []domain.APIKeyGroupBinding, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupBindings is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupBindings requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupBindings: %w", err)
+	}
+	return oldValue.GroupBindings, nil
+}
+
+// AppendGroupBindings adds dkgb to the "group_bindings" field.
+func (m *APIKeyMutation) AppendGroupBindings(dkgb []domain.APIKeyGroupBinding) {
+	m.appendgroup_bindings = append(m.appendgroup_bindings, dkgb...)
+}
+
+// AppendedGroupBindings returns the list of values that were appended to the "group_bindings" field in this mutation.
+func (m *APIKeyMutation) AppendedGroupBindings() ([]domain.APIKeyGroupBinding, bool) {
+	if len(m.appendgroup_bindings) == 0 {
+		return nil, false
+	}
+	return m.appendgroup_bindings, true
+}
+
+// ResetGroupBindings resets all changes to the "group_bindings" field.
+func (m *APIKeyMutation) ResetGroupBindings() {
+	m.group_bindings = nil
+	m.appendgroup_bindings = nil
 }
 
 // SetStatus sets the "status" field.
@@ -1532,7 +1622,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 25)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1553,6 +1643,12 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.group != nil {
 		fields = append(fields, apikey.FieldGroupID)
+	}
+	if m.group_bindings_enabled != nil {
+		fields = append(fields, apikey.FieldGroupBindingsEnabled)
+	}
+	if m.group_bindings != nil {
+		fields = append(fields, apikey.FieldGroupBindings)
 	}
 	if m.status != nil {
 		fields = append(fields, apikey.FieldStatus)
@@ -1624,6 +1720,10 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case apikey.FieldGroupID:
 		return m.GroupID()
+	case apikey.FieldGroupBindingsEnabled:
+		return m.GroupBindingsEnabled()
+	case apikey.FieldGroupBindings:
+		return m.GroupBindings()
 	case apikey.FieldStatus:
 		return m.Status()
 	case apikey.FieldLastUsedAt:
@@ -1679,6 +1779,10 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldName(ctx)
 	case apikey.FieldGroupID:
 		return m.OldGroupID(ctx)
+	case apikey.FieldGroupBindingsEnabled:
+		return m.OldGroupBindingsEnabled(ctx)
+	case apikey.FieldGroupBindings:
+		return m.OldGroupBindings(ctx)
 	case apikey.FieldStatus:
 		return m.OldStatus(ctx)
 	case apikey.FieldLastUsedAt:
@@ -1768,6 +1872,20 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupID(v)
+		return nil
+	case apikey.FieldGroupBindingsEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupBindingsEnabled(v)
+		return nil
+	case apikey.FieldGroupBindings:
+		v, ok := value.([]domain.APIKeyGroupBinding)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupBindings(v)
 		return nil
 	case apikey.FieldStatus:
 		v, ok := value.(string)
@@ -2106,6 +2224,12 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldGroupID:
 		m.ResetGroupID()
+		return nil
+	case apikey.FieldGroupBindingsEnabled:
+		m.ResetGroupBindingsEnabled()
+		return nil
+	case apikey.FieldGroupBindings:
+		m.ResetGroupBindings()
 		return nil
 	case apikey.FieldStatus:
 		m.ResetStatus()
