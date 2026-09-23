@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	apiKeyRateLimitKeyPrefix   = "apikey:ratelimit:"
-	apiKeyRateLimitDuration    = 24 * time.Hour
-	apiKeyAuthCachePrefix      = "apikey:auth:"
-	authCacheInvalidateChannel = "auth:cache:invalidate"
+	apiKeyRateLimitKeyPrefix         = "apikey:ratelimit:"
+	apiKeyRateLimitDuration          = 24 * time.Hour
+	apiKeyAuthCachePrefix            = "apikey:auth:"
+	apiKeyGroupBindingCooldownPrefix = "apikey:group-binding:cooldown:"
+	authCacheInvalidateChannel       = "auth:cache:invalidate"
 )
 
 // apiKeyRateLimitKey generates the Redis key for API key creation rate limiting.
@@ -26,6 +27,10 @@ func apiKeyRateLimitKey(userID int64) string {
 
 func apiKeyAuthCacheKey(key string) string {
 	return fmt.Sprintf("%s%s", apiKeyAuthCachePrefix, key)
+}
+
+func apiKeyGroupBindingCooldownKey(apiKeyID, groupID int64) string {
+	return fmt.Sprintf("%s%d:%d", apiKeyGroupBindingCooldownPrefix, apiKeyID, groupID)
 }
 
 type apiKeyCache struct {
@@ -57,6 +62,25 @@ func (c *apiKeyCache) IncrementCreateAttemptCount(ctx context.Context, userID in
 func (c *apiKeyCache) DeleteCreateAttemptCount(ctx context.Context, userID int64) error {
 	key := apiKeyRateLimitKey(userID)
 	return c.rdb.Del(ctx, key).Err()
+}
+
+func (c *apiKeyCache) IsGroupBindingCoolingDown(ctx context.Context, apiKeyID, groupID int64) (bool, error) {
+	_, err := c.rdb.Get(ctx, apiKeyGroupBindingCooldownKey(apiKeyID, groupID)).Result()
+	if errors.Is(err, redis.Nil) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (c *apiKeyCache) SetGroupBindingCooldown(ctx context.Context, apiKeyID, groupID int64, cooldownSeconds int) error {
+	key := apiKeyGroupBindingCooldownKey(apiKeyID, groupID)
+	if cooldownSeconds <= 0 {
+		return c.rdb.Del(ctx, key).Err()
+	}
+	return c.rdb.Set(ctx, key, "1", time.Duration(cooldownSeconds)*time.Second).Err()
 }
 
 func (c *apiKeyCache) IncrementDailyUsage(ctx context.Context, apiKey string) error {

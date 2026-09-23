@@ -21,6 +21,14 @@ import (
 // ChatCompletions handles OpenAI Chat Completions API requests.
 // POST /v1/chat/completions
 func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
+	if apiKey, ok := middleware2.GetAPIKeyFromContext(c); ok && apiKey != nil && apiKey.GroupBindingsEnabled {
+		h.chatCompletionsWithGroupBindings(c, apiKey)
+		return
+	}
+	h.chatCompletionsSingle(c)
+}
+
+func (h *OpenAIGatewayHandler) chatCompletionsSingle(c *gin.Context) {
 	streamStarted := false
 	defer h.recoverResponsesPanic(c, &streamStarted)
 
@@ -194,11 +202,17 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 				cls = classifySelectionFailureError(err, cls)
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					if errors.Is(err, service.ErrNoAvailableAccounts) && openAIChatGroupRetryAllowed(c, streamStarted, nil) {
+						return
+					}
 				}
 				h.handleStreamingAwareError(c, cls.Status, cls.ErrType, cls.Message, streamStarted)
 				return
 			} else {
 				if lastFailoverErr != nil {
+					if lastFailoverErr.ShouldRetryNextAccount() && openAIChatGroupRetryAllowed(c, streamStarted, lastFailoverErr) {
+						return
+					}
 					h.handleFailoverExhausted(c, lastFailoverErr, streamStarted)
 				} else {
 					h.handleStreamingAwareError(c, http.StatusBadGateway, "api_error", "Upstream request failed", streamStarted)
@@ -210,6 +224,9 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel)
 			if !cls.ModelNotFound {
 				markOpsRoutingCapacityLimited(c)
+				if openAIChatGroupRetryAllowed(c, streamStarted, nil) {
+					return
+				}
 			}
 			h.handleStreamingAwareError(c, cls.Status, cls.ErrType, cls.Message, streamStarted)
 			return
@@ -362,11 +379,17 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					failedAccountIDs[account.ID] = struct{}{}
 					lastFailoverErr = failoverErr
 					if switchCount >= maxAccountSwitches {
+						if failoverErr.ShouldRetryNextAccount() && openAIChatGroupRetryAllowed(c, streamStarted, failoverErr) {
+							return
+						}
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
 					switchCount++
 					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
+						if openAIChatGroupRetryAllowed(c, streamStarted, failoverErr) {
+							return
+						}
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}

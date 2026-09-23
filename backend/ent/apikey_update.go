@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 // APIKeyUpdate is the builder for updating APIKey entities.
@@ -117,6 +118,32 @@ func (_u *APIKeyUpdate) SetNillableGroupID(v *int64) *APIKeyUpdate {
 // ClearGroupID clears the value of the "group_id" field.
 func (_u *APIKeyUpdate) ClearGroupID() *APIKeyUpdate {
 	_u.mutation.ClearGroupID()
+	return _u
+}
+
+// SetGroupBindingsEnabled sets the "group_bindings_enabled" field.
+func (_u *APIKeyUpdate) SetGroupBindingsEnabled(v bool) *APIKeyUpdate {
+	_u.mutation.SetGroupBindingsEnabled(v)
+	return _u
+}
+
+// SetNillableGroupBindingsEnabled sets the "group_bindings_enabled" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableGroupBindingsEnabled(v *bool) *APIKeyUpdate {
+	if v != nil {
+		_u.SetGroupBindingsEnabled(*v)
+	}
+	return _u
+}
+
+// SetGroupBindings sets the "group_bindings" field.
+func (_u *APIKeyUpdate) SetGroupBindings(v []domain.APIKeyGroupBinding) *APIKeyUpdate {
+	_u.mutation.SetGroupBindings(v)
+	return _u
+}
+
+// AppendGroupBindings appends value to the "group_bindings" field.
+func (_u *APIKeyUpdate) AppendGroupBindings(v []domain.APIKeyGroupBinding) *APIKeyUpdate {
+	_u.mutation.AppendGroupBindings(v)
 	return _u
 }
 
@@ -593,6 +620,17 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.GroupBindingsEnabled(); ok {
+		_spec.SetField(apikey.FieldGroupBindingsEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.GroupBindings(); ok {
+		_spec.SetField(apikey.FieldGroupBindings, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedGroupBindings(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldGroupBindings, value)
+		})
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
 	}
@@ -904,6 +942,32 @@ func (_u *APIKeyUpdateOne) SetNillableGroupID(v *int64) *APIKeyUpdateOne {
 // ClearGroupID clears the value of the "group_id" field.
 func (_u *APIKeyUpdateOne) ClearGroupID() *APIKeyUpdateOne {
 	_u.mutation.ClearGroupID()
+	return _u
+}
+
+// SetGroupBindingsEnabled sets the "group_bindings_enabled" field.
+func (_u *APIKeyUpdateOne) SetGroupBindingsEnabled(v bool) *APIKeyUpdateOne {
+	_u.mutation.SetGroupBindingsEnabled(v)
+	return _u
+}
+
+// SetNillableGroupBindingsEnabled sets the "group_bindings_enabled" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableGroupBindingsEnabled(v *bool) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetGroupBindingsEnabled(*v)
+	}
+	return _u
+}
+
+// SetGroupBindings sets the "group_bindings" field.
+func (_u *APIKeyUpdateOne) SetGroupBindings(v []domain.APIKeyGroupBinding) *APIKeyUpdateOne {
+	_u.mutation.SetGroupBindings(v)
+	return _u
+}
+
+// AppendGroupBindings appends value to the "group_bindings" field.
+func (_u *APIKeyUpdateOne) AppendGroupBindings(v []domain.APIKeyGroupBinding) *APIKeyUpdateOne {
+	_u.mutation.AppendGroupBindings(v)
 	return _u
 }
 
@@ -1409,6 +1473,17 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GroupBindingsEnabled(); ok {
+		_spec.SetField(apikey.FieldGroupBindingsEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.GroupBindings(); ok {
+		_spec.SetField(apikey.FieldGroupBindings, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedGroupBindings(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldGroupBindings, value)
+		})
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)

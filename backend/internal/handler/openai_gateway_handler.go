@@ -35,6 +35,7 @@ import (
 // OpenAIGatewayHandler handles OpenAI API gateway requests
 type OpenAIGatewayHandler struct {
 	gatewayService             *service.OpenAIGatewayService
+	subscriptionService        *service.SubscriptionService
 	billingCacheService        *service.BillingCacheService
 	apiKeyService              *service.APIKeyService
 	usageRecordWorkerPool      *service.UsageRecordWorkerPool
@@ -374,9 +375,42 @@ func NewOpenAIGatewayHandler(
 	}
 }
 
+// SetSubscriptionService wires subscription lookup without changing existing constructor call sites.
+func (h *OpenAIGatewayHandler) SetSubscriptionService(subscriptionService *service.SubscriptionService) {
+	h.subscriptionService = subscriptionService
+}
+
+// resolveGroupSubscription resolves explicit group scope independently of middleware's primary group.
+func (h *OpenAIGatewayHandler) resolveGroupSubscription(ctx context.Context, userID, groupID int64) (*service.Group, *service.UserSubscription, error) {
+	if h == nil || h.gatewayService == nil || h.subscriptionService == nil || groupID <= 0 {
+		return nil, nil, errors.New("group subscription lookup is unavailable")
+	}
+	group, err := h.gatewayService.GetGroupByID(ctx, groupID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if group == nil {
+		return nil, nil, fmt.Errorf("group %d not found", groupID)
+	}
+	subscription, err := h.subscriptionService.GetActiveSubscription(ctx, userID, groupID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return group, subscription, nil
+}
+
 // Responses handles OpenAI Responses API endpoint
 // POST /openai/v1/responses
 func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
+	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
+	if ok && apiKey != nil && apiKey.GroupBindingsEnabled {
+		h.responsesWithGroupBindings(c, apiKey)
+		return
+	}
+	h.responsesSingle(c)
+}
+
+func (h *OpenAIGatewayHandler) responsesSingle(c *gin.Context) {
 	// 局部兜底：确保该 handler 内部任何 panic 都不会击穿到进程级。
 	streamStarted := false
 	defer h.recoverResponsesPanic(c, &streamStarted)
@@ -683,11 +717,17 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				cls = classifySelectionFailureError(err, cls)
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					if errors.Is(err, service.ErrNoAvailableAccounts) && openAIChatGroupRetryAllowed(c, streamStarted, nil) {
+						return
+					}
 				}
 				h.handleStreamingAwareError(c, cls.Status, cls.ErrType, cls.Message, streamStarted)
 				return
 			}
 			if lastFailoverErr != nil {
+				if lastFailoverErr.ShouldRetryNextAccount() && openAIChatGroupRetryAllowed(c, streamStarted, lastFailoverErr) {
+					return
+				}
 				h.handleFailoverExhausted(c, lastFailoverErr, streamStarted)
 			} else {
 				h.handleFailoverExhaustedSimple(c, 502, streamStarted)
@@ -698,6 +738,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, requestPlatform)
 			if !cls.ModelNotFound {
 				markOpsRoutingCapacityLimited(c)
+				if openAIChatGroupRetryAllowed(c, streamStarted, nil) {
+					return
+				}
 			}
 			h.handleStreamingAwareError(c, cls.Status, cls.ErrType, cls.Message, streamStarted)
 			return
@@ -886,6 +929,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						return
 					}
 					if openAIFirstOutputFailoverExhausted(failoverErr, &firstOutputTimeoutSwitchCount) {
+						if openAIChatGroupRetryAllowed(c, streamStarted, failoverErr) {
+							return
+						}
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
@@ -914,11 +960,17 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					failedAccountIDs[account.ID] = struct{}{}
 					lastFailoverErr = failoverErr
 					if switchCount >= maxAccountSwitches {
+						if failoverErr.ShouldRetryNextAccount() && openAIChatGroupRetryAllowed(c, streamStarted, failoverErr) {
+							return
+						}
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
 					switchCount++
 					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
+						if openAIChatGroupRetryAllowed(c, streamStarted, failoverErr) {
+							return
+						}
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}

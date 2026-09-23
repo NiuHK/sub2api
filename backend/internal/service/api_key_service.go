@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -25,6 +26,7 @@ import (
 
 var (
 	ErrAPIKeyNotFound       = infraerrors.NotFound("API_KEY_NOT_FOUND", "api key not found")
+	ErrInvalidGroupBindings = infraerrors.BadRequest("INVALID_GROUP_BINDINGS", "enabled bindings require distinct active groups on one platform, ascending unique priorities, non-negative cooldown, and matching primary group")
 	ErrGroupNotAllowed      = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
 	ErrAPIKeyExists         = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
 	ErrAPIKeyTooShort       = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
@@ -61,11 +63,12 @@ const (
 // 若编辑 Key 时无条件整行回写，并发累计的配额与限流计数就会被旧快照覆盖。
 // 因此调用方必须显式声明要改的列。
 type APIKeyUpdateFields struct {
-	Name      bool
-	Status    bool
-	Quota     bool
-	GroupID   bool
-	ExpiresAt bool
+	Name          bool
+	Status        bool
+	Quota         bool
+	GroupID       bool
+	GroupBindings bool
+	ExpiresAt     bool
 	// QuotaUsed 仅供"重置配额用量"路径声明；常规计费走 IncrementQuotaUsed。
 	QuotaUsed bool
 	// RateLimits 覆盖 rate_limit_5h / _1d / _7d 三个阈值。
@@ -169,6 +172,12 @@ type APIKeyQuotaUsageState struct {
 }
 
 // APIKeyCache defines cache operations for API key service
+// APIKeyGroupBindingCooldownCache is an optional distributed cooldown store.
+type APIKeyGroupBindingCooldownCache interface {
+	IsGroupBindingCoolingDown(ctx context.Context, apiKeyID, groupID int64) (bool, error)
+	SetGroupBindingCooldown(ctx context.Context, apiKeyID, groupID int64, cooldownSeconds int) error
+}
+
 type APIKeyCache interface {
 	GetCreateAttemptCount(ctx context.Context, userID int64) (int, error)
 	IncrementCreateAttemptCount(ctx context.Context, userID int64) error
@@ -209,11 +218,13 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name        string   `json:"name"`
-	GroupID     *int64   `json:"group_id"`
-	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
-	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
-	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
+	Name                 string                      `json:"name"`
+	GroupID              *int64                      `json:"group_id"`
+	GroupBindingsEnabled bool                        `json:"group_bindings_enabled"`
+	GroupBindings        []domain.APIKeyGroupBinding `json:"group_bindings"`
+	CustomKey            *string                     `json:"custom_key"`   // 可选的自定义key
+	IPWhitelist          []string                    `json:"ip_whitelist"` // IP 白名单
+	IPBlacklist          []string                    `json:"ip_blacklist"` // IP 黑名单
 
 	// Quota fields
 	Quota         float64 `json:"quota"`           // Quota limit in USD (0 = unlimited)
@@ -227,11 +238,13 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name        *string   `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	Status      *string   `json:"status"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	Name                 *string                      `json:"name"`
+	GroupID              *int64                       `json:"group_id"`
+	GroupBindingsEnabled *bool                        `json:"group_bindings_enabled"`
+	GroupBindings        *[]domain.APIKeyGroupBinding `json:"group_bindings"`
+	Status               *string                      `json:"status"`
+	IPWhitelist          *[]string                    `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist          *[]string                    `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
 
 	// Quota fields
 	Quota           *float64   `json:"quota"`       // Quota limit in USD (nil = no change, 0 = unlimited)
@@ -289,6 +302,7 @@ type APIKeyService struct {
 	userSubRepo               UserSubscriptionRepository
 	userGroupRateRepo         UserGroupRateRepository
 	cache                     APIKeyCache
+	groupBindingCooldownCache APIKeyGroupBindingCooldownCache
 	rateLimitCacheInvalid     RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
 	concurrencyService        *ConcurrencyService
 	cfg                       *config.Config
@@ -349,6 +363,9 @@ func NewAPIKeyService(
 		cache:             cache,
 		cfg:               cfg,
 	}
+	if cooldownCache, ok := cache.(APIKeyGroupBindingCooldownCache); ok {
+		svc.groupBindingCooldownCache = cooldownCache
+	}
 	svc.initAuthCache(cfg)
 	lookupConcurrency := defaultAuthLookupConcurrency
 	if cfg != nil && cfg.APIKeyAuth.LookupConcurrency > 0 {
@@ -357,6 +374,22 @@ func NewAPIKeyService(
 	svc.authLookupSlots = make(chan struct{}, lookupConcurrency)
 	svc.invalidAuthAbuse = newInvalidAuthAbuseLimiter(cfg)
 	return svc
+}
+
+// IsGroupBindingCoolingDown reports whether the API key/group binding has a distributed cooldown.
+func (s *APIKeyService) IsGroupBindingCoolingDown(ctx context.Context, apiKeyID, groupID int64) (bool, error) {
+	if s == nil || s.groupBindingCooldownCache == nil {
+		return false, fmt.Errorf("API key group binding cooldown cache is unavailable")
+	}
+	return s.groupBindingCooldownCache.IsGroupBindingCoolingDown(ctx, apiKeyID, groupID)
+}
+
+// SetGroupBindingCooldown sets a distributed cooldown in seconds; zero removes any persisted cooldown.
+func (s *APIKeyService) SetGroupBindingCooldown(ctx context.Context, apiKeyID, groupID int64, cooldownSeconds int) error {
+	if s == nil || s.groupBindingCooldownCache == nil {
+		return fmt.Errorf("API key group binding cooldown cache is unavailable")
+	}
+	return s.groupBindingCooldownCache.SetGroupBindingCooldown(ctx, apiKeyID, groupID, cooldownSeconds)
 }
 
 // SetRateLimitCacheInvalidator sets the optional rate limit cache invalidator.
@@ -457,6 +490,34 @@ func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group 
 	return user.CanBindGroup(group.ID, group.IsExclusive)
 }
 
+// validateGroupBindings keeps legacy keys untouched; enabled keys require an explicit ordered list.
+func (s *APIKeyService) validateGroupBindings(ctx context.Context, user *User, bindings []domain.APIKeyGroupBinding) error {
+	if len(bindings) == 0 {
+		return ErrInvalidGroupBindings
+	}
+	seenGroups := make(map[int64]bool, len(bindings))
+	seenPriorities := make(map[int]bool, len(bindings))
+	var platform string
+	for i, b := range bindings {
+		if b.GroupID <= 0 || b.Priority < 0 || b.CooldownSeconds < 0 || seenGroups[b.GroupID] || seenPriorities[b.Priority] || (i > 0 && b.Priority <= bindings[i-1].Priority) {
+			return ErrInvalidGroupBindings
+		}
+		seenGroups[b.GroupID], seenPriorities[b.Priority] = true, true
+		group, err := s.groupRepo.GetByID(ctx, b.GroupID)
+		if err != nil {
+			return fmt.Errorf("get group: %w", err)
+		}
+		if group == nil || group.Platform != PlatformOpenAI || !group.IsSubscriptionType() || !group.IsActive() || (i > 0 && group.Platform != platform) {
+			return ErrInvalidGroupBindings
+		}
+		if !s.canUserBindGroup(ctx, user, group) {
+			return ErrGroupNotAllowed
+		}
+		platform = group.Platform
+	}
+	return nil
+}
+
 // Create 创建API Key
 func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error) {
 	if err := validateCreateAPIKeyRequest(req); err != nil {
@@ -493,6 +554,19 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		if !s.canUserBindGroup(ctx, user, group) {
 			return nil, ErrGroupNotAllowed
 		}
+	}
+
+	if req.GroupBindingsEnabled {
+		if err := s.validateGroupBindings(ctx, user, req.GroupBindings); err != nil {
+			return nil, err
+		}
+		if req.GroupID != nil && *req.GroupID != req.GroupBindings[0].GroupID {
+			return nil, ErrInvalidGroupBindings
+		}
+		first := req.GroupBindings[0].GroupID
+		req.GroupID = &first
+	} else if len(req.GroupBindings) > 0 {
+		return nil, ErrInvalidGroupBindings
 	}
 
 	var key string
@@ -532,18 +606,20 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	// 创建API Key记录
 	apiKey := &APIKey{
-		UserID:      userID,
-		Key:         key,
-		Name:        html.EscapeString(req.Name),
-		GroupID:     req.GroupID,
-		Status:      StatusActive,
-		IPWhitelist: req.IPWhitelist,
-		IPBlacklist: req.IPBlacklist,
-		Quota:       req.Quota,
-		QuotaUsed:   0,
-		RateLimit5h: req.RateLimit5h,
-		RateLimit1d: req.RateLimit1d,
-		RateLimit7d: req.RateLimit7d,
+		UserID:               userID,
+		Key:                  key,
+		Name:                 html.EscapeString(req.Name),
+		GroupID:              req.GroupID,
+		GroupBindingsEnabled: req.GroupBindingsEnabled,
+		GroupBindings:        req.GroupBindings,
+		Status:               StatusActive,
+		IPWhitelist:          req.IPWhitelist,
+		IPBlacklist:          req.IPBlacklist,
+		Quota:                req.Quota,
+		QuotaUsed:            0,
+		RateLimit5h:          req.RateLimit5h,
+		RateLimit1d:          req.RateLimit1d,
+		RateLimit7d:          req.RateLimit7d,
 	}
 
 	// Set expiration time if specified
@@ -815,6 +891,42 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 		apiKey.GroupID = req.GroupID
 		fields.GroupID = true
+	}
+
+	if req.GroupBindingsEnabled != nil || req.GroupBindings != nil {
+		enabled := apiKey.GroupBindingsEnabled
+		bindings := apiKey.GroupBindings
+		if req.GroupBindingsEnabled != nil {
+			enabled = *req.GroupBindingsEnabled
+		}
+		if req.GroupBindings != nil {
+			bindings = *req.GroupBindings
+		}
+		if enabled {
+			user, err := s.userRepo.GetByID(ctx, userID)
+			if err != nil {
+				return nil, fmt.Errorf("get user: %w", err)
+			}
+			if err := s.validateGroupBindings(ctx, user, bindings); err != nil {
+				return nil, err
+			}
+			if req.GroupID != nil && *req.GroupID != bindings[0].GroupID {
+				return nil, ErrInvalidGroupBindings
+			}
+			first := bindings[0].GroupID
+			apiKey.GroupID = &first
+			fields.GroupID = true
+		} else {
+			if req.GroupBindings != nil && len(bindings) > 0 {
+				return nil, ErrInvalidGroupBindings
+			}
+			bindings = nil // keep group_id as the current primary group and remove stale references
+		}
+		apiKey.GroupBindingsEnabled = enabled
+		apiKey.GroupBindings = bindings
+		fields.GroupBindings = true
+	} else if req.GroupID != nil && apiKey.GroupBindingsEnabled {
+		return nil, ErrInvalidGroupBindings
 	}
 
 	if req.Status != nil {

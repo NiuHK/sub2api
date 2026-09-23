@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 // APIKeyCreate is the builder for creating a APIKey entity.
@@ -96,6 +97,26 @@ func (_c *APIKeyCreate) SetNillableGroupID(v *int64) *APIKeyCreate {
 	if v != nil {
 		_c.SetGroupID(*v)
 	}
+	return _c
+}
+
+// SetGroupBindingsEnabled sets the "group_bindings_enabled" field.
+func (_c *APIKeyCreate) SetGroupBindingsEnabled(v bool) *APIKeyCreate {
+	_c.mutation.SetGroupBindingsEnabled(v)
+	return _c
+}
+
+// SetNillableGroupBindingsEnabled sets the "group_bindings_enabled" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableGroupBindingsEnabled(v *bool) *APIKeyCreate {
+	if v != nil {
+		_c.SetGroupBindingsEnabled(*v)
+	}
+	return _c
+}
+
+// SetGroupBindings sets the "group_bindings" field.
+func (_c *APIKeyCreate) SetGroupBindings(v []domain.APIKeyGroupBinding) *APIKeyCreate {
+	_c.mutation.SetGroupBindings(v)
 	return _c
 }
 
@@ -383,6 +404,14 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.GroupBindingsEnabled(); !ok {
+		v := apikey.DefaultGroupBindingsEnabled
+		_c.mutation.SetGroupBindingsEnabled(v)
+	}
+	if _, ok := _c.mutation.GroupBindings(); !ok {
+		v := apikey.DefaultGroupBindings
+		_c.mutation.SetGroupBindings(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -448,6 +477,12 @@ func (_c *APIKeyCreate) check() error {
 		if err := apikey.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.GroupBindingsEnabled(); !ok {
+		return &ValidationError{Name: "group_bindings_enabled", err: errors.New(`ent: missing required field "APIKey.group_bindings_enabled"`)}
+	}
+	if _, ok := _c.mutation.GroupBindings(); !ok {
+		return &ValidationError{Name: "group_bindings", err: errors.New(`ent: missing required field "APIKey.group_bindings"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "APIKey.status"`)}
@@ -530,6 +565,14 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 		_node.Name = value
+	}
+	if value, ok := _c.mutation.GroupBindingsEnabled(); ok {
+		_spec.SetField(apikey.FieldGroupBindingsEnabled, field.TypeBool, value)
+		_node.GroupBindingsEnabled = value
+	}
+	if value, ok := _c.mutation.GroupBindings(); ok {
+		_spec.SetField(apikey.FieldGroupBindings, field.TypeJSON, value)
+		_node.GroupBindings = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -778,6 +821,30 @@ func (u *APIKeyUpsert) UpdateGroupID() *APIKeyUpsert {
 // ClearGroupID clears the value of the "group_id" field.
 func (u *APIKeyUpsert) ClearGroupID() *APIKeyUpsert {
 	u.SetNull(apikey.FieldGroupID)
+	return u
+}
+
+// SetGroupBindingsEnabled sets the "group_bindings_enabled" field.
+func (u *APIKeyUpsert) SetGroupBindingsEnabled(v bool) *APIKeyUpsert {
+	u.Set(apikey.FieldGroupBindingsEnabled, v)
+	return u
+}
+
+// UpdateGroupBindingsEnabled sets the "group_bindings_enabled" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateGroupBindingsEnabled() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldGroupBindingsEnabled)
+	return u
+}
+
+// SetGroupBindings sets the "group_bindings" field.
+func (u *APIKeyUpsert) SetGroupBindings(v []domain.APIKeyGroupBinding) *APIKeyUpsert {
+	u.Set(apikey.FieldGroupBindings, v)
+	return u
+}
+
+// UpdateGroupBindings sets the "group_bindings" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateGroupBindings() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldGroupBindings)
 	return u
 }
 
@@ -1203,6 +1270,34 @@ func (u *APIKeyUpsertOne) UpdateGroupID() *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) ClearGroupID() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearGroupID()
+	})
+}
+
+// SetGroupBindingsEnabled sets the "group_bindings_enabled" field.
+func (u *APIKeyUpsertOne) SetGroupBindingsEnabled(v bool) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetGroupBindingsEnabled(v)
+	})
+}
+
+// UpdateGroupBindingsEnabled sets the "group_bindings_enabled" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateGroupBindingsEnabled() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateGroupBindingsEnabled()
+	})
+}
+
+// SetGroupBindings sets the "group_bindings" field.
+func (u *APIKeyUpsertOne) SetGroupBindings(v []domain.APIKeyGroupBinding) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetGroupBindings(v)
+	})
+}
+
+// UpdateGroupBindings sets the "group_bindings" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateGroupBindings() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateGroupBindings()
 	})
 }
 
@@ -1841,6 +1936,34 @@ func (u *APIKeyUpsertBulk) UpdateGroupID() *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) ClearGroupID() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearGroupID()
+	})
+}
+
+// SetGroupBindingsEnabled sets the "group_bindings_enabled" field.
+func (u *APIKeyUpsertBulk) SetGroupBindingsEnabled(v bool) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetGroupBindingsEnabled(v)
+	})
+}
+
+// UpdateGroupBindingsEnabled sets the "group_bindings_enabled" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateGroupBindingsEnabled() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateGroupBindingsEnabled()
+	})
+}
+
+// SetGroupBindings sets the "group_bindings" field.
+func (u *APIKeyUpsertBulk) SetGroupBindings(v []domain.APIKeyGroupBinding) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetGroupBindings(v)
+	})
+}
+
+// UpdateGroupBindings sets the "group_bindings" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateGroupBindings() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateGroupBindings()
 	})
 }
 

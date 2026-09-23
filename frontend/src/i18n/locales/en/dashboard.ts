@@ -116,6 +116,16 @@ export default {
     nameLabel: 'Name',
     namePlaceholder: 'My API Key',
     groupLabel: 'Group',
+    groupBindings: {
+      toggle: 'Enable multi-group failover',
+      hint: 'OpenAI subscription groups are tried in ascending priority. Cooldown is per group, in seconds.',
+      priority: 'Priority',
+      cooldown: 'Cooldown (s)',
+      priorityFor: 'Priority for {group}',
+      cooldownFor: 'Cooldown seconds for {group}',
+      noGroups: 'No active OpenAI subscription groups are available.',
+      required: 'Select at least one group for multi-group failover.'
+    },
     providerLabel: 'Provider',
     providers: {
       anthropic: 'Anthropic',
