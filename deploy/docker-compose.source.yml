@@ -1,0 +1,20 @@
+# Source-built deployment through the existing host Caddy container.
+# Keep PostgreSQL/Redis on the private application network; only the app joins
+# the shared proxy network, and no host port is published.
+services:
+  sub2api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}
+    image: sub2api-local:latest
+    ports: !reset []
+    networks:
+      - sub2api-network
+      - caddy-network
+
+networks:
+  caddy-network:
+    external: true
+    name: nas-caddy

@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical
+.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical deploy deploy-down deploy-status deploy-logs
 
 FRONTEND_CRITICAL_VITEST := \
 	src/i18n/__tests__/localeKeyCompleteness.spec.ts \
@@ -47,3 +47,16 @@ test-frontend:
 
 test-frontend-critical:
 	@pnpm --dir frontend exec vitest run $(FRONTEND_CRITICAL_VITEST)
+
+# Build the current source and deploy it behind the host Caddy at api2.pinellia.uk.
+deploy:
+	@bash deploy/local-deploy.sh
+
+deploy-down:
+	@docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.source.yml down
+
+deploy-status:
+	@docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.source.yml ps
+
+deploy-logs:
+	@docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.source.yml logs -f --tail=100
