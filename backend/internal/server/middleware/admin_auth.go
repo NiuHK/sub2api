@@ -32,6 +32,12 @@ func adminAuth(
 	auditService *service.AuditLogService,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Account management is shared with signed-in users; the remaining admin
+		// surface still requires administrator authorization.
+		if isSharedAccountManagementPath(c.Request.Method, c.Request.URL.Path) && c.GetHeader("x-api-key") == "" {
+			jwtAuth(authService, userService, userService, settingService, auditService)(c)
+			return
+		}
 		// WebSocket upgrade requests cannot set Authorization headers in browsers.
 		// For admin WebSocket endpoints (e.g. Ops realtime), allow passing the JWT via
 		// Sec-WebSocket-Protocol (subprotocol list) using a prefixed token item:
@@ -77,6 +83,21 @@ func adminAuth(
 		// 无有效认证信息
 		AbortWithError(c, 401, "UNAUTHORIZED", "Authorization required")
 	}
+}
+
+func isSharedAccountManagementPath(method, path string) bool {
+	for _, prefix := range []string{
+		"/api/v1/admin/accounts", "/api/v1/admin/openai/", "/api/v1/admin/gemini/",
+		"/api/v1/admin/antigravity/", "/api/v1/admin/grok/", "/api/v1/admin/cn-providers/",
+	} {
+		if path == prefix || strings.HasPrefix(path, strings.TrimSuffix(prefix, "/")+"/") {
+			return true
+		}
+	}
+	if method == "GET" {
+		return path == "/api/v1/admin/groups/all" || path == "/api/v1/admin/proxies/all" || path == "/api/v1/admin/settings/web-search-emulation"
+	}
+	return false
 }
 
 func isWebSocketUpgradeRequest(c *gin.Context) bool {
