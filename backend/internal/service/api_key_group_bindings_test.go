@@ -118,6 +118,35 @@ func TestAPIKeyServiceGroupBindingsCreateAndUpdate(t *testing.T) {
 	require.Equal(t, other, *repo.key.GroupID, "disabled keys retain their primary legacy group")
 }
 
+func TestAPIKeyServiceUpdatePreservesExistingDisabledBinding(t *testing.T) {
+	ctx := context.Background()
+	first := int64(4)
+	old := []domain.APIKeyGroupBinding{{GroupID: 4, Priority: 10, CooldownSeconds: 30}, {GroupID: 1, Priority: 100, CooldownSeconds: 30}, {GroupID: 5, Priority: 200}}
+	repo := &bindingAPIKeyRepo{key: &APIKey{ID: 11, UserID: 7, GroupID: &first, GroupBindingsEnabled: true, GroupBindings: old}}
+	svc := &APIKeyService{cfg: &config.Config{}, apiKeyRepo: repo, userRepo: bindingUserRepo{}, userSubRepo: bindingUserSubRepo{}, groupRepo: bindingGroupRepo{groups: map[int64]*Group{
+		1: {ID: 1, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeSubscription, Status: StatusActive},
+		4: {ID: 4, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeStandard, Status: StatusDisabled},
+		5: {ID: 5, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeStandard, Status: StatusActive},
+	}}}
+	active := int64(1)
+	updated := []domain.APIKeyGroupBinding{{GroupID: 4, Priority: 10, CooldownSeconds: 30}, {GroupID: 1, Priority: 100, CooldownSeconds: 45}}
+	_, err := svc.Update(ctx, 11, 7, UpdateAPIKeyRequest{GroupID: &active, GroupBindings: &updated})
+	require.NoError(t, err)
+	require.Equal(t, updated, repo.key.GroupBindings)
+	require.Equal(t, active, *repo.key.GroupID, "primary must be the first active binding")
+
+	removed := []domain.APIKeyGroupBinding{{GroupID: 1, Priority: 100, CooldownSeconds: 45}}
+	_, err = svc.Update(ctx, 11, 7, UpdateAPIKeyRequest{GroupBindings: &removed})
+	require.NoError(t, err)
+	require.Equal(t, removed, repo.key.GroupBindings)
+	_, err = svc.Update(ctx, 11, 7, UpdateAPIKeyRequest{GroupBindings: &updated})
+	require.ErrorIs(t, err, ErrInvalidGroupBindings, "removed disabled bindings cannot be reintroduced")
+
+	inactiveOnly := []domain.APIKeyGroupBinding{{GroupID: 4, Priority: 10}}
+	_, err = svc.Update(ctx, 11, 7, UpdateAPIKeyRequest{GroupBindings: &inactiveOnly})
+	require.ErrorIs(t, err, ErrInvalidGroupBindings)
+}
+
 func TestAPIKeyAuthSnapshotGroupBindingsRoundTrip(t *testing.T) {
 	svc := &APIKeyService{}
 	bindings := []domain.APIKeyGroupBinding{{GroupID: 1, Priority: 0, CooldownSeconds: 12}, {GroupID: 2, Priority: 1, CooldownSeconds: 0}}

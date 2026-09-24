@@ -44,11 +44,12 @@ func TestResolveOpenAIGroupBindingCandidatesOrdersStandardGroups(t *testing.T) {
 	repo := openAIGroupBindingGroupRepo{groups: map[int64]*service.Group{
 		11: {ID: 11, Status: service.StatusActive, Platform: service.PlatformOpenAI, SubscriptionType: service.SubscriptionTypeStandard},
 		22: {ID: 22, Status: service.StatusActive, Platform: service.PlatformOpenAI, SubscriptionType: service.SubscriptionTypeStandard},
+		33: {ID: 33, Status: service.StatusDisabled, Platform: service.PlatformOpenAI, SubscriptionType: service.SubscriptionTypeStandard},
 	}}
 	gateway := service.NewOpenAIGatewayService(nil, nil, nil, nil, nil, nil, nil, &config.Config{}, service.NewSchedulerSnapshotService(nil, nil, nil, repo, nil), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	h := &OpenAIGatewayHandler{gatewayService: gateway, apiKeyService: &service.APIKeyService{}, subscriptionService: service.NewSubscriptionService(nil, nil, nil, nil, nil), billingCacheService: &service.BillingCacheService{}}
 	key := &service.APIKey{ID: 5, UserID: 7, User: &service.User{ID: 7}, GroupBindingsEnabled: true,
-		GroupBindings: []domain.APIKeyGroupBinding{{GroupID: 22, Priority: 2}, {GroupID: 11, Priority: 1}}}
+		GroupBindings: []domain.APIKeyGroupBinding{{GroupID: 22, Priority: 200}, {GroupID: 33, Priority: 10}, {GroupID: 11, Priority: 100}}}
 	candidates, err := h.resolveOpenAIGroupBindingCandidates(context.Background(), key, "gpt-test")
 	if err != nil || len(candidates) != 2 {
 		t.Fatalf("resolve candidates = %#v, %v", candidates, err)

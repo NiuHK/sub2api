@@ -586,21 +586,32 @@
             {{ t('keys.groupBindings.toggle') }}
           </label>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.groupBindings.hint') }}</p>
-          <div v-if="formData.group_bindings_enabled" class="space-y-2">
-            <div v-for="group in eligibleBindingGroups" :key="group.id" class="flex flex-wrap items-center gap-3">
-              <label class="flex min-w-0 flex-1 items-center gap-2 text-sm">
-                <input type="checkbox" :checked="hasGroupBinding(group.id)" @change="toggleGroupBinding(group.id, ($event.target as HTMLInputElement).checked)" />
-                <span>{{ group.name }}</span>
-              </label>
-              <label class="flex items-center gap-1 text-xs">
-                <span>{{ t('keys.groupBindings.priority') }}</span>
-                <input v-if="hasGroupBinding(group.id)" type="number" min="1" :value="bindingPriority(group.id)" class="input w-20" :aria-label="t('keys.groupBindings.priorityFor', { group: group.name })" @change="setBindingPriority(group.id, Number(($event.target as HTMLInputElement).value))" />
-              </label>
-              <label v-if="hasGroupBinding(group.id)" class="flex items-center gap-1 text-xs">
-                <span>{{ t('keys.groupBindings.cooldown') }}</span>
-                <input type="number" min="0" :value="bindingCooldown(group.id)" class="input w-24" :aria-label="t('keys.groupBindings.cooldownFor', { group: group.name })" @change="setBindingCooldown(group.id, Number(($event.target as HTMLInputElement).value))" />
-              </label>
+          <div v-if="formData.group_bindings_enabled" class="space-y-3">
+            <div v-for="(binding, index) in formData.group_bindings" :key="index" class="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-dark-600" data-testid="binding-card">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium">{{ t('keys.groupBindings.groupFor', { index: index + 1 }) }}</span>
+                <button type="button" class="rounded p-1 text-sm text-red-500 hover:text-red-600" @click="formData.group_bindings.splice(index, 1)">{{ t('keys.groupBindings.remove') }}</button>
+              </div>
+              <div>
+                <select v-model.number="binding.group_id" class="input w-full" :aria-label="t('keys.groupBindings.groupFor', { index: index + 1 })">
+                  <option :value="0">{{ t('keys.groupBindings.chooseGroup') }}</option>
+                  <option v-if="binding.group_id && !eligibleBindingGroups.some(group => group.id === binding.group_id)" :value="binding.group_id" disabled>{{ t('keys.groupBindings.unavailable', { id: binding.group_id }) }}</option>
+                  <option v-for="group in eligibleBindingGroups.filter(group => group.id === binding.group_id || !formData.group_bindings.some(other => other.group_id === group.id))" :key="group.id" :value="group.id">{{ group.name }}</option>
+                </select>
+              </div>
+              <p v-if="binding.group_id && !eligibleBindingGroups.some(group => group.id === binding.group_id)" class="text-xs text-amber-600">{{ t('keys.groupBindings.unavailableHint') }}</p>
+              <div class="flex flex-wrap gap-3">
+                <label class="flex items-center gap-1 text-xs">
+                  <span>{{ t('keys.groupBindings.priority') }}</span>
+                  <input v-model.number="binding.priority" type="number" min="0" class="input w-24" :aria-label="t('keys.groupBindings.priorityFor', { group: binding.group_id })" />
+                </label>
+                <label class="flex items-center gap-1 text-xs">
+                  <span>{{ t('keys.groupBindings.cooldown') }}</span>
+                  <input v-model.number="binding.cooldown_seconds" type="number" min="0" class="input w-24" :aria-label="t('keys.groupBindings.cooldownFor', { group: binding.group_id })" />
+                </label>
+              </div>
             </div>
+            <button type="button" class="flex w-full items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:border-primary-400 hover:text-primary-600 dark:border-dark-600" @click="addGroupBinding">{{ t('keys.groupBindings.add') }}</button>
             <p v-if="!eligibleBindingGroups.length" class="text-xs text-gray-500">{{ t('keys.groupBindings.noGroups') }}</p>
           </div>
         </section>
@@ -1567,32 +1578,13 @@ const canConfigureGroupBindings = computed(() => formData.value.group_bindings_e
   ? groups.value.some((group) => group.id === formData.value.group_id && group.platform === 'openai')
   : createProvider.value === 'openai'))
 const eligibleBindingGroups = computed(() => groups.value.filter((group) => group.platform === 'openai' && group.status === 'active'))
-const hasGroupBinding = (groupId: number) => formData.value.group_bindings.some((binding) => binding.group_id === groupId)
-const bindingPriority = (groupId: number) => formData.value.group_bindings.find((binding) => binding.group_id === groupId)?.priority ?? 1
-const bindingCooldown = (groupId: number) => formData.value.group_bindings.find((binding) => binding.group_id === groupId)?.cooldown_seconds ?? 0
-const toggleGroupBinding = (groupId: number, enabled: boolean) => {
-  if (enabled && !hasGroupBinding(groupId)) formData.value.group_bindings.push({ group_id: groupId, priority: formData.value.group_bindings.length + 1, cooldown_seconds: 0 })
-  if (!enabled) formData.value.group_bindings = formData.value.group_bindings.filter((binding) => binding.group_id !== groupId)
-  formData.value.group_bindings.sort((a, b) => a.priority - b.priority)
-  formData.value.group_bindings = formData.value.group_bindings.map((binding, index) => ({ ...binding, priority: index + 1 }))
-}
-const setBindingPriority = (groupId: number, priority: number) => {
-  const bindings = [...formData.value.group_bindings].sort((a, b) => a.priority - b.priority)
-  const currentIndex = bindings.findIndex((binding) => binding.group_id === groupId)
-  if (currentIndex < 0 || !Number.isFinite(priority)) return
-  const [binding] = bindings.splice(currentIndex, 1)
-  bindings.splice(Math.max(0, Math.min(bindings.length, Math.trunc(priority) - 1)), 0, binding)
-  formData.value.group_bindings = bindings.map((item, index) => ({ ...item, priority: index + 1 }))
+const addGroupBinding = () => {
+  formData.value.group_bindings.push({ group_id: 0, priority: 100, cooldown_seconds: 30 })
 }
 const setGroupBindingsEnabled = (enabled: boolean) => {
   formData.value.group_bindings_enabled = enabled
   if (!enabled) formData.value.group_bindings = []
 }
-const setBindingCooldown = (groupId: number, cooldown: number) => {
-  const binding = formData.value.group_bindings.find((item) => item.group_id === groupId)
-  if (binding && Number.isFinite(cooldown) && cooldown >= 0) binding.cooldown_seconds = cooldown
-}
-
 const selectCreateProvider = (provider: KeyGroupProvider) => {
   if (createProvider.value === provider) return
   createProvider.value = provider
@@ -1862,10 +1854,20 @@ const handleSubmit = async () => {
     appStore.showError(t('keys.groupBindings.required'))
     return
   }
-  const groupId = formData.value.group_bindings_enabled ? bindings[0].group_id : formData.value.group_id
+  if (formData.value.group_bindings_enabled && (
+    bindings.some((binding) => !binding.group_id || !Number.isInteger(binding.priority) || binding.priority < 0 || !Number.isInteger(binding.cooldown_seconds) || binding.cooldown_seconds < 0) ||
+    new Set(bindings.map((binding) => binding.group_id)).size !== bindings.length ||
+    new Set(bindings.map((binding) => binding.priority)).size !== bindings.length
+  )) {
+    appStore.showError(t('keys.groupBindings.invalid'))
+    return
+  }
+  const groupId = formData.value.group_bindings_enabled
+    ? bindings.find((binding) => eligibleBindingGroups.value.some((group) => group.id === binding.group_id))?.group_id ?? null
+    : formData.value.group_id
   // Validate the legacy group selection when multi-group bindings are disabled.
   if (groupId === null) {
-    appStore.showError(t('keys.groupRequired'))
+    appStore.showError(t(formData.value.group_bindings_enabled ? 'keys.groupBindings.noActive' : 'keys.groupRequired'))
     return
   }
 

@@ -583,10 +583,11 @@ describe('user KeysView column settings', () => {
       const toggle = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('keys.groupBindings.toggle'))
       expect(toggle).toBeDefined()
       await toggle!.setValue(true)
-      const bindingLabels = wrapper.findAll('input[type="checkbox"]').map((input) => input.element.parentElement?.textContent?.trim() ?? '')
-      expect(bindingLabels).toContain('Shared group 2')
-      expect(bindingLabels).toContain('Shared group 91')
-      expect(bindingLabels).not.toContain('Shared group 90')
+      await wrapper.findAll('button').find((button) => button.text() === 'keys.groupBindings.add')!.trigger('click')
+      const options = wrapper.get('[data-testid="binding-card"] select').findAll('option').map((option) => option.text())
+      expect(options).toContain('Shared group 2')
+      expect(options).toContain('Shared group 91')
+      expect(options).not.toContain('Shared group 90')
     })
 
     it('requires a binding and submits the lowest-priority binding as the legacy group', async () => {
@@ -606,19 +607,55 @@ describe('user KeysView column settings', () => {
       expect(showError).toHaveBeenCalledWith('keys.groupBindings.required')
       expect(keysAPI.create).not.toHaveBeenCalled()
 
-      const bindingCheckboxes = wrapper.findAll('input[type="checkbox"]').filter((input) => input.element.parentElement?.textContent?.match(/Shared group 30|Shared group 31/))
-      await bindingCheckboxes[0].setValue(true)
-      await bindingCheckboxes[1].setValue(true)
-      const priorities = wrapper.findAll('input[type="number"]').filter((input) => input.attributes('aria-label')?.startsWith('keys.groupBindings.priorityFor'))
-      await priorities[1].setValue(1)
+      await wrapper.findAll('button').find((button) => button.text() === 'keys.groupBindings.add')!.trigger('click')
+      await wrapper.findAll('button').find((button) => button.text() === 'keys.groupBindings.add')!.trigger('click')
+      const cards = wrapper.findAll('[data-testid="binding-card"]')
+      expect(cards[0].get('input[type="number"]').element.value).toBe('100')
+      expect(cards[0].findAll('input[type="number"]')[1].element.value).toBe('30')
+      await cards[0].get('select').setValue('30')
+      await cards[1].get('select').setValue('31')
+      await wrapper.get('#key-form').trigger('submit')
+      expect(showError).toHaveBeenCalledWith('keys.groupBindings.invalid')
+      await cards[1].get('input[type="number"]').setValue(50)
       await wrapper.get('#key-form').trigger('submit')
       await flushPromises()
       const args = vi.mocked(keysAPI.create).mock.calls[0]
       expect(args[1]).toBe(31)
       expect(args[8]).toEqual({ enabled: true, bindings: [
-        { group_id: 31, priority: 1, cooldown_seconds: 0 },
-        { group_id: 30, priority: 2, cooldown_seconds: 0 },
+        { group_id: 31, priority: 50, cooldown_seconds: 30 },
+        { group_id: 30, priority: 100, cooldown_seconds: 30 },
       ] })
+    })
+
+    it('retains an unavailable binding while editing active cards, and allows removing it', async () => {
+      const key = { ...createApiKey(), group_id: 30, group_bindings_enabled: true, group_bindings: [
+        { group_id: 30, priority: 10, cooldown_seconds: 30 },
+        { group_id: 2, priority: 100, cooldown_seconds: 30 },
+        { group_id: 31, priority: 200, cooldown_seconds: 30 },
+      ] }
+      listKeys.mockResolvedValue({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+      getAvailableGroups.mockResolvedValue([{ ...availableGroups[1], status: 'active' },
+        { ...availableGroups[1], id: 31, status: 'active' }])
+      updateKey.mockResolvedValue(key)
+      const wrapper = await mountView()
+      await getButtonByText(wrapper, 'common.edit').trigger('click')
+      expect(wrapper.findAll('[data-testid="binding-card"]')).toHaveLength(3)
+      expect(wrapper.text()).toContain('keys.groupBindings.unavailableHint')
+      await wrapper.findAll('[data-testid="binding-card"]')[2].get('button').trigger('click')
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({ group_id: 2, group_bindings: [
+        { group_id: 30, priority: 10, cooldown_seconds: 30 },
+        { group_id: 2, priority: 100, cooldown_seconds: 30 },
+      ] }))
+      await getButtonByText(wrapper, 'common.edit').trigger('click')
+      await wrapper.findAll('[data-testid="binding-card"]')[0].get('button').trigger('click')
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(updateKey).toHaveBeenLastCalledWith(1, expect.objectContaining({ group_id: 2, group_bindings: [
+        { group_id: 2, priority: 100, cooldown_seconds: 30 },
+        { group_id: 31, priority: 200, cooldown_seconds: 30 },
+      ] }))
     })
 
     it('clears stale bindings when editing a key whose multi-group mode is disabled', async () => {
@@ -656,8 +693,8 @@ describe('user KeysView column settings', () => {
       await groupSelect(wrapper).vm.$emit('update:modelValue', 2)
       const enable = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('keys.groupBindings.toggle'))!
       await enable.setValue(true)
-      const groupCheckbox = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('Shared group 30'))!
-      await groupCheckbox.setValue(true)
+      await wrapper.findAll('button').find((button) => button.text() === 'keys.groupBindings.add')!.trigger('click')
+      await wrapper.get('[data-testid="binding-card"] select').setValue('30')
       await enable.setValue(false)
       vi.mocked(keysAPI.create).mockResolvedValue(createApiKey())
       await wrapper.get('#key-form').trigger('submit')

@@ -492,30 +492,52 @@ func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group 
 
 // validateGroupBindings keeps legacy keys untouched; enabled keys require an explicit ordered list.
 func (s *APIKeyService) validateGroupBindings(ctx context.Context, user *User, bindings []domain.APIKeyGroupBinding) error {
+	_, err := s.validateGroupBindingsForUpdate(ctx, user, bindings, nil)
+	return err
+}
+
+// Existing disabled groups remain saved as configuration, but are not eligible
+// for routing or for becoming the primary group. New bindings must be active.
+func (s *APIKeyService) validateGroupBindingsForUpdate(ctx context.Context, user *User, bindings, existing []domain.APIKeyGroupBinding) (int64, error) {
 	if len(bindings) == 0 {
-		return ErrInvalidGroupBindings
+		return 0, ErrInvalidGroupBindings
+	}
+	old := make(map[int64]bool, len(existing))
+	for _, b := range existing {
+		old[b.GroupID] = true
 	}
 	seenGroups := make(map[int64]bool, len(bindings))
 	seenPriorities := make(map[int]bool, len(bindings))
-	var platform string
+	var primary int64
 	for i, b := range bindings {
 		if b.GroupID <= 0 || b.Priority < 0 || b.CooldownSeconds < 0 || seenGroups[b.GroupID] || seenPriorities[b.Priority] || (i > 0 && b.Priority <= bindings[i-1].Priority) {
-			return ErrInvalidGroupBindings
+			return 0, ErrInvalidGroupBindings
 		}
 		seenGroups[b.GroupID], seenPriorities[b.Priority] = true, true
 		group, err := s.groupRepo.GetByID(ctx, b.GroupID)
 		if err != nil {
-			return fmt.Errorf("get group: %w", err)
+			return 0, fmt.Errorf("get group: %w", err)
 		}
-		if group == nil || group.Platform != PlatformOpenAI || !group.IsActive() || (i > 0 && group.Platform != platform) {
-			return ErrInvalidGroupBindings
+		if group == nil || group.Platform != PlatformOpenAI {
+			return 0, ErrInvalidGroupBindings
+		}
+		if !group.IsActive() {
+			if !old[b.GroupID] {
+				return 0, ErrInvalidGroupBindings
+			}
+			continue
 		}
 		if !s.canUserBindGroup(ctx, user, group) {
-			return ErrGroupNotAllowed
+			return 0, ErrGroupNotAllowed
 		}
-		platform = group.Platform
+		if primary == 0 {
+			primary = b.GroupID
+		}
 	}
-	return nil
+	if primary == 0 {
+		return 0, ErrInvalidGroupBindings
+	}
+	return primary, nil
 }
 
 // Create 创建API Key
@@ -907,14 +929,18 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			if err != nil {
 				return nil, fmt.Errorf("get user: %w", err)
 			}
-			if err := s.validateGroupBindings(ctx, user, bindings); err != nil {
+			var existing []domain.APIKeyGroupBinding
+			if apiKey.GroupBindingsEnabled {
+				existing = apiKey.GroupBindings
+			}
+			primary, err := s.validateGroupBindingsForUpdate(ctx, user, bindings, existing)
+			if err != nil {
 				return nil, err
 			}
-			if req.GroupID != nil && *req.GroupID != bindings[0].GroupID {
+			if req.GroupID != nil && *req.GroupID != primary {
 				return nil, ErrInvalidGroupBindings
 			}
-			first := bindings[0].GroupID
-			apiKey.GroupID = &first
+			apiKey.GroupID = &primary
 			fields.GroupID = true
 		} else {
 			if req.GroupBindings != nil && len(bindings) > 0 {

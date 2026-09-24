@@ -124,7 +124,15 @@ export default {
       priorityFor: 'Priority for {group}',
       cooldownFor: 'Cooldown seconds for {group}',
       noGroups: 'No active OpenAI groups are available.',
-      required: 'Select at least one group for multi-group failover.'
+      required: 'Add at least one group for multi-group failover.',
+      invalid: 'Choose distinct groups and priorities, with non-negative integer cooldowns.',
+      add: 'Add failover group',
+      remove: 'Remove',
+      groupFor: 'Failover group {index}',
+      chooseGroup: 'Select group',
+      unavailable: 'Group #{id} (unavailable)',
+      unavailableHint: 'This binding is retained but is not used for failover; you can remove it.',
+      noActive: 'At least one available failover group is required.'
     },
     providerLabel: 'Provider',
     providers: {

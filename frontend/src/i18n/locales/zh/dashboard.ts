@@ -124,7 +124,15 @@ export default {
       priorityFor: '{group} 的优先级',
       cooldownFor: '{group} 的冷却秒数',
       noGroups: '没有可用的 OpenAI 分组。',
-      required: '启用多分组故障切换时，至少选择一个分组。'
+      required: '启用多分组故障切换时，至少添加一个分组。',
+      invalid: '请为每张卡片选择不同的分组和优先级，并填写非负整数的冷却时间。',
+      add: '添加故障分组',
+      remove: '移除',
+      groupFor: '故障分组 {index}',
+      chooseGroup: '请选择分组',
+      unavailable: '分组 #{id}（当前不可用）',
+      unavailableHint: '该绑定已保留，但当前不会参与故障切换；可以移除。',
+      noActive: '至少需要一个当前可用的故障分组。'
     },
     providerLabel: '厂商',
     providers: {
