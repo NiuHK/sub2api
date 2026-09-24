@@ -14,9 +14,18 @@
 
 **AI API Gateway Platform for Subscription Quota Distribution**
 
-English | [中文](README_CN.md) | [日本語](README_JA.md)
+English | [中文](README_CN.md)
 
 </div>
+
+> This repository is a fork of [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api). Future upstream updates may be selectively cherry-picked into this fork. The additions below are specific to this fork. Upstream installation scripts, release binaries, and prebuilt Docker images **do not include these changes**; build an image from this source tree to use them.
+
+## What's new in this fork
+
+- **Personal OpenAI accounts:** When a regular user registers or is created by an admin, the server attempts to provision an exclusive OpenAI group named `private-usr<user ID>` and a 1,000-day subscription. Users manage accounts at `/accounts`; admins see all accounts, while regular users' account lists and shared account APIs are scoped to their private group. When a regular user adds an OpenAI account, group selection is hidden and the server binds only their private group. A subscription **does not create an upstream account** by itself.
+- **Per-key group failover:** An OpenAI API Key can bind multiple eligible groups with ordered priorities and per-group cooldowns. Chat Completions and Responses requests can try the next group after failure. Keys without this feature retain their single-group behavior.
+- **Backfill for existing users:** See the [preview, backup, and provisioning guide](tools/README-private-openai.md). A provisioning failure is logged without undoing the user's registration; repair it with the documented tool after taking a database backup.
+- **Source-built Docker image:** Build this fork with `docker build -t sub2api-fork:local .`. For the preconfigured local Docker/Caddy host, see the [source deployment guide](deploy/SOURCE_DEPLOYMENT.md). The primary UI theme is blue.
 
 ## ⚠️ Important Notice
 
@@ -170,22 +179,9 @@ Please read the following carefully before using this project:
 
 </table>
 
-## Overview
+## Upstream at a glance
 
-Sub2API is an AI API gateway platform designed to distribute and manage API quotas from AI product subscriptions. Users can access upstream AI services through platform-generated API Keys, while the platform handles authentication, billing, load balancing, and request forwarding.
-
-## Features
-
-- **Multi-Account Management** - Support multiple upstream account types (OAuth, API Key)
-- **API Key Distribution** - Generate and manage API Keys for users
-- **Precise Billing** - Token-level usage tracking and cost calculation
-- **Smart Scheduling** - Intelligent account selection with sticky sessions
-- **Concurrency Control** - Per-user and per-account concurrency limits
-- **Rate Limiting** - Configurable request and token rate limits
-- **Built-in Payment System** - Supports EasyPay, Alipay, WeChat Pay, and Stripe for user self-service top-up, no separate payment service needed ([Configuration Guide](docs/PAYMENT.md))
-- **Admin Dashboard** - Web interface for monitoring and management
-- **Composite Groups** - Admin routing layer that resolves requested models to concrete providers for multi-provider groups ([Operator Guide](docs/COMPOSITE_GROUPS.md))
-- **External System Integration** - Embed external systems (e.g. ticketing) via iframe to extend the admin dashboard
+Sub2API provides upstream account integration, API Key distribution, and request forwarding, plus usage billing, scheduling, concurrency/rate controls, an admin dashboard, and built-in payments ([payment guide](docs/PAYMENT.md)). It also supports [composite groups](docs/COMPOSITE_GROUPS.md). See “What's new in this fork” above for this repository's additions.
 
 ## Ecosystem
 
@@ -221,7 +217,9 @@ Nginx drops headers containing underscores by default (e.g. `session_id`), which
 
 ## Deployment
 
-### Method 1: Script Installation (Recommended)
+> The upstream installation script and prebuilt images below install the upstream version, not this fork. To use the fork features, build an image from this source tree as described above. `deploy/SOURCE_DEPLOYMENT.md` applies only to a host with its Docker/Caddy network already configured.
+
+### Method 1: Script Installation (upstream version)
 
 One-click installation script that downloads pre-built binaries from GitHub Releases.
 
@@ -290,7 +288,7 @@ curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install
 
 ---
 
-### Method 2: Docker Compose (Recommended)
+### Method 2: Docker Compose (upstream prebuilt image)
 
 Deploy with Docker Compose, including PostgreSQL and Redis containers.
 

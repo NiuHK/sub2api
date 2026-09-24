@@ -14,10 +14,18 @@
 
 **AI API 网关平台 - 订阅配额分发管理**
 
-[English](README.md) | 中文 | [日本語](README_JA.md)
+[English](README.md) | 中文
 
 </div>
 
+> 本仓库是 [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) 的二次开发版。后期可能会通过 Cherry-pick 选择性合并上游更新。下文先介绍二开新增功能；原项目的安装脚本、Release 二进制文件及预构建 Docker 镜像**不会自动包含本仓库的改动**，使用二开版请从当前源码构建镜像。
+
+## 二开新增功能
+
+- **用户自己的 OpenAI 账号**：注册或由管理员创建普通用户时，自动尝试创建 `private-usr<用户ID>` 专属 OpenAI 订阅分组及有效期 1000 天的订阅。用户可在 `/accounts` 使用账号管理页面添加和管理账号；管理员仍可查看全部账号，普通用户的账号列表和已开放的账号接口按其私有分组隔离。普通用户添加 OpenAI 账号时不显示分组选择，服务端强制绑定其私有分组。私有订阅**不会自动创建上游账号**。
+- **API Key 多分组故障切换**：OpenAI API Key 可按优先级绑定多个可用分组，并分别设置失败后的冷却时间；Chat Completions / Responses 请求可依次尝试下一分组。未启用该功能的 Key 继续沿用原单分组行为。
+- **存量用户补建工具**：提供 [预览、备份及补建说明](tools/README-private-openai.md)，用于为现有普通用户补建私有分组与订阅。自动创建失败只记录日志，不会撤销注册；可按说明修复。补建前请先备份数据库。
+- **源码 Docker 部署**：可从本仓库运行 `docker build -t sub2api-fork:local .` 构建二开镜像；已配置的本地 Docker/Caddy 环境参见 [源码部署说明](deploy/SOURCE_DEPLOYMENT.md)。界面主色调调整为蓝色。
 
 ## ⚠️ 重要提醒
 
@@ -173,21 +181,9 @@
 
 </table>
 
-## 项目概述
+## 原项目概览
 
-Sub2API 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅的 API 配额。用户通过平台生成的 API Key 调用上游 AI 服务，平台负责鉴权、计费、负载均衡和请求转发。
-
-## 核心功能
-
-- **多账号管理** - 支持多种上游账号类型（OAuth、API Key）
-- **API Key 分发** - 为用户生成和管理 API Key
-- **精确计费** - Token 级别的用量追踪和成本计算
-- **智能调度** - 智能账号选择，支持粘性会话
-- **并发控制** - 用户级和账号级并发限制
-- **速率限制** - 可配置的请求和 Token 速率限制
-- **内置支付系统** - 支持 EasyPay 易支付、支付宝官方、微信官方、Stripe，用户自助充值，无需独立部署支付服务（[配置指南](docs/PAYMENT_CN.md)）
-- **管理后台** - Web 界面进行监控和管理
-- **外部系统集成** - 支持通过 iframe 嵌入外部系统（如工单等），扩展管理后台功能
+Sub2API 提供上游账号接入、API Key 分发与请求转发，并集成用量计费、账号调度、并发/速率控制、管理后台和自助支付（[支付配置](docs/PAYMENT_CN.md)）。此处仅作概要介绍；本仓库的区别见上方「二开新增功能」。
 
 ## 生态项目
 
@@ -247,7 +243,9 @@ fast_mode = true
 
 ## 部署方式
 
-### 方式一：脚本安装（推荐）
+> 以下上游安装脚本和预构建镜像安装的是原项目版本；如需本仓库的二开功能，请按上文从当前源码构建镜像。`deploy/SOURCE_DEPLOYMENT.md` 仅适用于已配置对应 Docker/Caddy 网络的宿主机。
+
+### 方式一：脚本安装（上游版本）
 
 一键安装脚本，自动从 GitHub Releases 下载预编译的二进制文件。
 
@@ -316,7 +314,7 @@ curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install
 
 ---
 
-### 方式二：Docker Compose（推荐）
+### 方式二：Docker Compose（上游预构建镜像）
 
 使用 Docker Compose 部署，包含 PostgreSQL 和 Redis 容器。
 
