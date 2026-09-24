@@ -16,6 +16,15 @@ func (r *privateCreateGroupRepo) ListActiveByPlatform(_ context.Context, _ strin
 	return r.groups, nil
 }
 
+func (r *privateCreateGroupRepo) GetByIDLite(_ context.Context, id int64) (*Group, error) {
+	for i := range r.groups {
+		if r.groups[i].ID == id {
+			return &r.groups[i], nil
+		}
+	}
+	return nil, ErrGroupNotFound
+}
+
 type privateCreateAccountRepo struct {
 	AccountRepository
 	bound   []int64
@@ -72,4 +81,15 @@ func TestRegularUserOpenAICreateForcesOwnPrivateGroup(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []int64{999}, adminRepo.bound)
+
+	// Other platforms may still use public groups, but cannot attach to another
+	// user's private group and expose their credentials on that user's list.
+	foreignRepo := &privateCreateAccountRepo{}
+	foreignSvc := &adminServiceImpl{groupRepo: groups, accountRepo: foreignRepo}
+	_, err = foreignSvc.CreateAccount(WithAccountCreatorUserID(context.Background(), 12), &CreateAccountInput{
+		Name: "foreign", Platform: PlatformAnthropic, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "test"}, GroupIDs: []int64{22},
+	})
+	require.Error(t, err)
+	require.Nil(t, foreignRepo.created)
 }

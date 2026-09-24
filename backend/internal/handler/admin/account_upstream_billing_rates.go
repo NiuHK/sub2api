@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -58,6 +59,24 @@ func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
 				return
 			}
 			groupID = parsed
+		}
+	}
+
+	if role, ok := middleware.GetUserRoleFromContext(c); ok && role != service.RoleAdmin {
+		subject, ok := middleware.GetAuthSubjectFromContext(c)
+		if !ok {
+			response.Error(c, http.StatusUnauthorized, "Authorization required")
+			return
+		}
+		var err error
+		groupID, err = h.privateGroupID(c, subject.UserID)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		if groupID == 0 {
+			response.Success(c, upstreamBillingRatesResponse{Items: []service.UpstreamBillingRateSnapshotItem{}, Page: page, PageSize: pageSize})
+			return
 		}
 	}
 

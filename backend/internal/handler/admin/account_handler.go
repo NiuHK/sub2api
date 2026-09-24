@@ -681,18 +681,11 @@ func (h *AccountHandler) List(c *gin.Context) {
 			response.ErrorFrom(c, infraerrors.Unauthorized("UNAUTHORIZED", "Authorization required"))
 			return
 		}
-		name := fmt.Sprintf("private-usr%d", subject.UserID)
-		groups, _, err := h.adminService.ListGroups(c.Request.Context(), 1, 10000, "", "", name, nil, "", "")
+		var err error
+		groupID, err = h.privateGroupID(c, subject.UserID)
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return
-		}
-		groupID = 0
-		for _, group := range groups {
-			if group.Name == name {
-				groupID = group.ID
-				break
-			}
 		}
 		if groupID == 0 {
 			response.Paginated(c, []AccountWithConcurrency{}, 0, page, pageSize)

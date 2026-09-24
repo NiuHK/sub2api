@@ -25,6 +25,7 @@ func RegisterAdminRoutes(
 
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
+	admin.Use(h.Admin.Account.GuardUserAccountAccess)
 	admin.Use(func(c *gin.Context) {
 		role, _ := middleware.GetUserRoleFromContext(c)
 		if role != service.RoleAdmin {
