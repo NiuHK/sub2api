@@ -469,7 +469,7 @@
     <BaseDialog
       :show="showCreateModal || showEditModal"
       :title="showEditModal ? t('keys.editKey') : t('keys.createKey')"
-      width="normal"
+      :width="formData.group_bindings_enabled ? 'wide' : 'normal'"
       @close="closeModals"
     >
       <form id="key-form" @submit.prevent="handleSubmit" class="space-y-5">
@@ -557,26 +557,26 @@
                 <span class="text-sm font-medium">{{ t('keys.groupBindings.groupFor', { index: index + 1 }) }}</span>
                 <button type="button" class="rounded p-1 text-sm text-red-500 hover:text-red-600" @click="formData.group_bindings.splice(index, 1)">{{ t('keys.groupBindings.remove') }}</button>
               </div>
-              <div>
-                <KeyGroupSelect
-                  :model-value="binding.group_id || null"
-                  :options="bindingGroupOptions(binding.group_id)"
-                  :unavailable-id="binding.group_id"
-                  :aria-label="t('keys.groupBindings.groupFor', { index: index + 1 })"
-                  @update:model-value="binding.group_id = $event ?? 0"
-                />
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem] sm:items-end">
+                <div class="min-w-0">
+                  <KeyGroupSelect
+                    :model-value="binding.group_id || null"
+                    :options="bindingGroupOptions(binding.group_id)"
+                    :unavailable-id="binding.group_id"
+                    :aria-label="t('keys.groupBindings.groupFor', { index: index + 1 })"
+                    @update:model-value="binding.group_id = $event ?? 0"
+                  />
+                </div>
+                <label class="flex min-w-0 flex-col gap-1 text-xs">
+                  <span>{{ t('keys.groupBindings.priority') }}</span>
+                  <input v-model.number="binding.priority" type="number" min="0" class="input w-full" :aria-label="t('keys.groupBindings.priorityFor', { group: binding.group_id })" />
+                </label>
+                <label class="flex min-w-0 flex-col gap-1 text-xs">
+                  <span>{{ t('keys.groupBindings.cooldown') }}</span>
+                  <input v-model.number="binding.cooldown_seconds" type="number" min="0" class="input w-full" :aria-label="t('keys.groupBindings.cooldownFor', { group: binding.group_id })" />
+                </label>
               </div>
               <p v-if="binding.group_id && !eligibleBindingGroups.some(group => group.id === binding.group_id)" class="text-xs text-amber-600">{{ t('keys.groupBindings.unavailableHint') }}</p>
-              <div class="flex flex-wrap gap-3">
-                <label class="flex items-center gap-1 text-xs">
-                  <span>{{ t('keys.groupBindings.priority') }}</span>
-                  <input v-model.number="binding.priority" type="number" min="0" class="input w-24" :aria-label="t('keys.groupBindings.priorityFor', { group: binding.group_id })" />
-                </label>
-                <label class="flex items-center gap-1 text-xs">
-                  <span>{{ t('keys.groupBindings.cooldown') }}</span>
-                  <input v-model.number="binding.cooldown_seconds" type="number" min="0" class="input w-24" :aria-label="t('keys.groupBindings.cooldownFor', { group: binding.group_id })" />
-                </label>
-              </div>
             </div>
             <button type="button" class="flex w-full items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:border-primary-400 hover:text-primary-600 dark:border-dark-600" @click="addGroupBinding">{{ t('keys.groupBindings.add') }}</button>
             <p v-if="!eligibleBindingGroups.length" class="text-xs text-gray-500">{{ t('keys.groupBindings.noGroups') }}</p>
