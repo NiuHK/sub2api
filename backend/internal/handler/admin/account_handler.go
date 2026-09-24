@@ -28,6 +28,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -671,6 +672,31 @@ func (h *AccountHandler) List(c *gin.Context) {
 				return
 			}
 			groupID = parsedGroupID
+		}
+	}
+
+	if role, ok := middleware.GetUserRoleFromContext(c); ok && role != service.RoleAdmin {
+		subject, ok := middleware.GetAuthSubjectFromContext(c)
+		if !ok {
+			response.ErrorFrom(c, infraerrors.Unauthorized("UNAUTHORIZED", "Authorization required"))
+			return
+		}
+		name := fmt.Sprintf("private-usr%d", subject.UserID)
+		groups, _, err := h.adminService.ListGroups(c.Request.Context(), 1, 10000, "", "", name, nil, "", "")
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		groupID = 0
+		for _, group := range groups {
+			if group.Name == name {
+				groupID = group.ID
+				break
+			}
+		}
+		if groupID == 0 {
+			response.Paginated(c, []AccountWithConcurrency{}, 0, page, pageSize)
+			return
 		}
 	}
 

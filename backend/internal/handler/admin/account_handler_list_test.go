@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -77,6 +78,45 @@ func TestAccountHandlerListLiteUsesCompactDTOAndETag(t *testing.T) {
 	require.NoError(t, json.Unmarshal(recFull.Body.Bytes(), &fullPayload))
 	require.Contains(t, fullPayload.Data.Items[0], "groups")
 	require.Contains(t, fullPayload.Data.Items[0], "account_groups")
+}
+
+func TestAccountHandlerListScopesRegularUserToExactPrivateGroup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	adminSvc := newStubAdminService()
+	adminSvc.groups = []service.Group{
+		{ID: 11, Name: "private-usr12"},
+		{ID: 22, Name: "private-usr123"},
+	}
+	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	for _, tc := range []struct {
+		role      string
+		userID    int64
+		wantGroup int64
+		wantCalls int
+	}{
+		{service.RoleAdmin, 12, 999, 1},
+		{service.RoleUser, 12, 11, 1},
+		{service.RoleUser, 123, 22, 1},
+		{service.RoleUser, 7, 0, 0},
+	} {
+		adminSvc.lastListAccounts.calls = 0
+		router := gin.New()
+		router.Use(func(c *gin.Context) {
+			c.Set(string(middleware.ContextKeyUserRole), tc.role)
+			c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: tc.userID})
+			c.Next()
+		})
+		router.GET("/api/v1/admin/accounts", handler.List)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?group=999", nil))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Equal(t, tc.wantCalls, adminSvc.lastListAccounts.calls)
+		if tc.wantCalls > 0 {
+			require.Equal(t, tc.wantGroup, adminSvc.lastListAccounts.groupID)
+		} else {
+			require.Contains(t, rec.Body.String(), `"total":0`)
+		}
+	}
 }
 
 func TestAccountHandlerListLiteStaysBelowResponseBudget(t *testing.T) {
