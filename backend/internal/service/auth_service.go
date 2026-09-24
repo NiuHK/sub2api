@@ -996,6 +996,14 @@ func (s *AuthService) postAuthUserBootstrap(ctx context.Context, user *User, sig
 		signupSource = "email"
 	}
 	s.updateUserSignupSource(ctx, user.ID, signupSource)
+	// All email/OAuth signup paths reach this bootstrap only after user creation.
+	// Fail open: a provisioning error must not strand a successfully registered user;
+	// the idempotent operator tool can repair it by user ID.
+	if user.Role == RoleUser && s.entClient != nil {
+		if err := ensurePrivateOpenAISubscription(ctx, s.entClient, user.ID); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to provision private OpenAI subscription: user_id=%d err=%v", user.ID, err)
+		}
+	}
 
 	if touchLogin {
 		s.touchUserLogin(ctx, user.ID)

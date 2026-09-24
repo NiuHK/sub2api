@@ -1,18 +1,23 @@
 -- Run with psql -v ON_ERROR_STOP=1 -v apply=false|true -f this_file.
 -- This provisions resources only. API Key authorization continues to use the real
 -- user_subscriptions(user_id, group_id) row; the name is never an auth bypass.
+SELECT set_config('sub2api.private_target_user_id', :'target_user_id', false);
 SELECT count(*) AS eligible_users FROM users
-WHERE role = 'user' AND deleted_at IS NULL;
+WHERE role = 'user' AND deleted_at IS NULL
+  AND id = COALESCE(NULLIF(current_setting('sub2api.private_target_user_id'), 'all')::bigint, id);
 SELECT count(*) AS groups_to_create FROM users u
 WHERE u.role = 'user' AND u.deleted_at IS NULL
+  AND u.id = COALESCE(NULLIF(current_setting('sub2api.private_target_user_id'), 'all')::bigint, u.id)
   AND NOT EXISTS (SELECT 1 FROM groups g WHERE g.name = 'private-usr' || u.id AND g.deleted_at IS NULL);
 SELECT count(*) AS subscriptions_to_create FROM users u
 JOIN groups g ON g.name = 'private-usr' || u.id AND g.deleted_at IS NULL
 WHERE u.role = 'user' AND u.deleted_at IS NULL
+  AND u.id = COALESCE(NULLIF(current_setting('sub2api.private_target_user_id'), 'all')::bigint, u.id)
   AND NOT EXISTS (SELECT 1 FROM user_subscriptions s WHERE s.user_id = u.id AND s.group_id = g.id);
 SELECT count(*) AS conflicting_names FROM users u
 JOIN groups g ON g.name = 'private-usr' || u.id AND g.deleted_at IS NULL
 WHERE u.role = 'user' AND u.deleted_at IS NULL
+  AND u.id = COALESCE(NULLIF(current_setting('sub2api.private_target_user_id'), 'all')::bigint, u.id)
   AND (g.description IS DISTINCT FROM 'Managed private OpenAI group for user ' || u.id || ' (private-subscription-v1)'
        OR g.platform <> 'openai' OR g.subscription_type <> 'subscription' OR NOT g.is_exclusive
        OR g.status <> 'active');
@@ -20,12 +25,14 @@ SELECT count(*) AS invalid_managed_subscriptions FROM users u
 JOIN groups g ON g.name = 'private-usr' || u.id AND g.deleted_at IS NULL
 JOIN user_subscriptions s ON s.user_id = u.id AND s.group_id = g.id
 WHERE u.role = 'user' AND u.deleted_at IS NULL
+  AND u.id = COALESCE(NULLIF(current_setting('sub2api.private_target_user_id'), 'all')::bigint, u.id)
   AND (s.notes IS DISTINCT FROM 'Managed private OpenAI subscription for user ' || u.id || ' (private-subscription-v1)'
        OR s.status <> 'active' OR s.expires_at <= now());
 SELECT count(*) AS subscriptions_for_other_users FROM users u
 JOIN groups g ON g.name = 'private-usr' || u.id AND g.deleted_at IS NULL
 JOIN user_subscriptions s ON s.group_id = g.id AND s.user_id <> u.id
-WHERE u.role = 'user' AND u.deleted_at IS NULL;
+WHERE u.role = 'user' AND u.deleted_at IS NULL
+  AND u.id = COALESCE(NULLIF(current_setting('sub2api.private_target_user_id'), 'all')::bigint, u.id);
 
 \if :apply
 BEGIN;
@@ -41,7 +48,15 @@ DECLARE
 BEGIN
     -- Serialize this script with itself; unique indexes handle outside writers.
     PERFORM pg_advisory_xact_lock(719023, 1000);
-    FOR u IN SELECT id FROM users WHERE role = 'user' AND deleted_at IS NULL ORDER BY id LOOP
+    IF current_setting('sub2api.private_target_user_id') <> 'all' AND NOT EXISTS (
+        SELECT 1 FROM users WHERE id = current_setting('sub2api.private_target_user_id')::bigint
+          AND role = 'user' AND deleted_at IS NULL
+    ) THEN
+        RAISE EXCEPTION 'Requested user does not exist or is not eligible';
+    END IF;
+    FOR u IN SELECT id FROM users WHERE role = 'user' AND deleted_at IS NULL
+             AND id = COALESCE(NULLIF(current_setting('sub2api.private_target_user_id'), 'all')::bigint, id)
+             ORDER BY id LOOP
         group_name := 'private-usr' || u.id;
         group_description := 'Managed private OpenAI group for user ' || u.id || ' (private-subscription-v1)';
         sub_note := 'Managed private OpenAI subscription for user ' || u.id || ' (private-subscription-v1)';
