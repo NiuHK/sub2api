@@ -475,6 +475,13 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 	return account, nil
 }
 
+type accountCreatorUserIDKey struct{}
+
+// WithAccountCreatorUserID marks account creation by a non-admin panel user.
+func WithAccountCreatorUserID(ctx context.Context, userID int64) context.Context {
+	return context.WithValue(ctx, accountCreatorUserIDKey{}, userID)
+}
+
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
 	accountExtra, err := normalizeOpenAILongContextBillingExtra(input.Platform, input.Extra)
 	if err != nil {
@@ -492,8 +499,28 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		return nil, err
 	}
 
-	// 绑定分组
+	// 普通用户新增 OpenAI 账号只能绑定自己的私有分组；忽略请求中的分组。
 	groupIDs := input.GroupIDs
+	if userID, ok := ctx.Value(accountCreatorUserIDKey{}).(int64); ok && input.Platform == PlatformOpenAI {
+		if userID <= 0 {
+			return nil, fmt.Errorf("invalid account creator")
+		}
+		name := fmt.Sprintf("private-usr%d", userID)
+		groups, err := s.groupRepo.ListActiveByPlatform(ctx, PlatformOpenAI)
+		if err != nil {
+			return nil, err
+		}
+		groupIDs = nil
+		for _, group := range groups {
+			if group.Name == name {
+				groupIDs = []int64{group.ID}
+				break
+			}
+		}
+		if len(groupIDs) == 0 {
+			return nil, fmt.Errorf("private OpenAI group %s not found", name)
+		}
+	}
 	// 如果没有指定分组,自动绑定对应平台的默认分组
 	if len(groupIDs) == 0 && !input.SkipDefaultGroupBind {
 		defaultGroupName := input.Platform + "-default"

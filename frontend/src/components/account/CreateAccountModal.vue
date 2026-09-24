@@ -3524,6 +3524,7 @@
 
         <!-- Group Selection - 仅标准模式显示 -->
         <GroupSelector
+          v-if="form.platform !== 'openai' || authStore.isAdmin"
           v-model="form.group_ids"
           :groups="groups"
           :platform="form.platform"
@@ -3889,6 +3890,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 import {
   claudeModels,
@@ -4083,6 +4085,7 @@ const emit = defineEmits<{
 }>()
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 const hideAccountLongContextBilling = computed(() => {
   return allSelectedGroupsEnableLongContextPricing(form.group_ids, props.groups)

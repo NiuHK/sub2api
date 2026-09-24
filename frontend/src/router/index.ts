@@ -514,7 +514,7 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/admin/accounts',
+    path: '/accounts',
     name: 'AdminAccounts',
     component: () => import('@/views/admin/AccountsView.vue'),
     meta: {
