@@ -37,7 +37,7 @@ func GroupModelAllowlist() gin.HandlerFunc {
 			return
 		}
 		if c.Request != nil && apiKey.GroupBindingsEnabled && apiKey.Group.Platform == service.PlatformOpenAI &&
-			apiKey.Group.IsSubscriptionType() && isMultiGroupAPIKeyEndpoint(c.Request.Method, c.Request.URL.Path) {
+			isMultiGroupAPIKeyEndpoint(c.Request.Method, c.Request.URL.Path) {
 			c.Next()
 			return
 		}

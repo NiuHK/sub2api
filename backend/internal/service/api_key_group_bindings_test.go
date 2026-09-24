@@ -7,9 +7,19 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/stretchr/testify/require"
 )
+
+type bindingUserSubRepo struct{ UserSubscriptionRepository }
+
+func (bindingUserSubRepo) GetActiveByUserIDAndGroupID(_ context.Context, userID, groupID int64) (*UserSubscription, error) {
+	if userID != 7 || (groupID != 1 && groupID != 2) {
+		return nil, ErrSubscriptionNotFound
+	}
+	return &UserSubscription{UserID: userID, GroupID: groupID}, nil
+}
 
 type bindingGroupRepo struct {
 	GroupRepository
@@ -26,16 +36,18 @@ func (r bindingGroupRepo) GetByID(_ context.Context, id int64) (*Group, error) {
 
 func TestAPIKeyServiceValidateGroupBindings(t *testing.T) {
 	ctx := context.Background()
-	svc := &APIKeyService{groupRepo: bindingGroupRepo{groups: map[int64]*Group{
+	svc := &APIKeyService{userSubRepo: bindingUserSubRepo{}, groupRepo: bindingGroupRepo{groups: map[int64]*Group{
 		1: {ID: 1, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeSubscription, Status: StatusActive},
 		2: {ID: 2, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeSubscription, Status: StatusActive, IsExclusive: true},
 		3: {ID: 3, Platform: PlatformAnthropic, SubscriptionType: SubscriptionTypeSubscription, Status: StatusActive},
 		4: {ID: 4, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeSubscription, Status: StatusDisabled},
-		5: {ID: 5, Platform: PlatformOpenAI, SubscriptionType: "standard", Status: StatusActive},
+		5: {ID: 5, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeStandard, Status: StatusActive},
+		6: {ID: 6, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeStandard, Status: StatusActive, IsExclusive: true},
 	}}}
-	user := &User{AllowedGroups: []int64{2}}
+	user := &User{ID: 7, AllowedGroups: []int64{2}}
 	valid := []domain.APIKeyGroupBinding{{GroupID: 1, Priority: 0, CooldownSeconds: 0}, {GroupID: 2, Priority: 10, CooldownSeconds: 30}}
 	require.NoError(t, svc.validateGroupBindings(ctx, user, valid))
+	require.NoError(t, svc.validateGroupBindings(ctx, user, []domain.APIKeyGroupBinding{{GroupID: 1, Priority: 0}, {GroupID: 5, Priority: 1}}))
 	for _, bindings := range [][]domain.APIKeyGroupBinding{
 		nil, {{GroupID: 0}}, {{GroupID: 1, CooldownSeconds: -1}},
 		{{GroupID: 1}, {GroupID: 1, Priority: 1}},
@@ -43,7 +55,7 @@ func TestAPIKeyServiceValidateGroupBindings(t *testing.T) {
 		{{GroupID: 2, Priority: 2}, {GroupID: 1, Priority: 1}},
 		{{GroupID: 1}, {GroupID: 3, Priority: 1}},
 		{{GroupID: 4}},
-		{{GroupID: 5}},
+		{{GroupID: 6}},
 	} {
 		require.Error(t, svc.validateGroupBindings(ctx, user, bindings), "%+v", bindings)
 	}
@@ -80,9 +92,9 @@ func (r *bindingAPIKeyRepo) Update(_ context.Context, key *APIKey, fields APIKey
 func TestAPIKeyServiceGroupBindingsCreateAndUpdate(t *testing.T) {
 	ctx := context.Background()
 	repo := &bindingAPIKeyRepo{}
-	svc := &APIKeyService{apiKeyRepo: repo, userRepo: bindingUserRepo{}, groupRepo: bindingGroupRepo{groups: map[int64]*Group{
-		1: {ID: 1, Platform: PlatformOpenAI, Status: StatusActive},
-		2: {ID: 2, Platform: PlatformOpenAI, Status: StatusActive, IsExclusive: true},
+	svc := &APIKeyService{cfg: &config.Config{}, apiKeyRepo: repo, userRepo: bindingUserRepo{}, userSubRepo: bindingUserSubRepo{}, groupRepo: bindingGroupRepo{groups: map[int64]*Group{
+		1: {ID: 1, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeSubscription, Status: StatusActive},
+		2: {ID: 2, Platform: PlatformOpenAI, SubscriptionType: SubscriptionTypeSubscription, Status: StatusActive, IsExclusive: true},
 	}}}
 	bindings := []domain.APIKeyGroupBinding{{GroupID: 1, Priority: 0}, {GroupID: 2, Priority: 1, CooldownSeconds: 15}}
 	_, err := svc.Create(ctx, 7, CreateAPIKeyRequest{Name: "test", GroupBindingsEnabled: true, GroupBindings: bindings})

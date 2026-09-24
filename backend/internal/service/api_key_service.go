@@ -507,7 +507,7 @@ func (s *APIKeyService) validateGroupBindings(ctx context.Context, user *User, b
 		if err != nil {
 			return fmt.Errorf("get group: %w", err)
 		}
-		if group == nil || group.Platform != PlatformOpenAI || !group.IsSubscriptionType() || !group.IsActive() || (i > 0 && group.Platform != platform) {
+		if group == nil || group.Platform != PlatformOpenAI || !group.IsActive() || (i > 0 && group.Platform != platform) {
 			return ErrInvalidGroupBindings
 		}
 		if !s.canUserBindGroup(ctx, user, group) {

@@ -1,0 +1,5 @@
+# Use the preserved pre-upgrade application image with the same Compose service,
+# database, volumes and Caddy network. Never run the old and new app concurrently.
+services:
+  sub2api:
+    image: sub2api-local:backup-before-group-routing

@@ -572,25 +572,27 @@ describe('user KeysView column settings', () => {
       getAvailableGroups.mockResolvedValue(availableGroups)
     })
 
-    it('shows bindings only for active OpenAI subscription groups and submits them with the key', async () => {
+    it('shows active OpenAI subscription and standard groups but excludes other platforms', async () => {
       getAvailableGroups.mockResolvedValue([
         { ...availableGroups[1], subscription_type: 'subscription', status: 'active' },
-        { ...availableGroups[0], id: 90, subscription_type: 'subscription', status: 'active' },
-        { ...availableGroups[1], id: 91, subscription_type: 'standard', status: 'active' },
+        { ...availableGroups[0], id: 90, name: 'Shared group 90', subscription_type: 'subscription', status: 'active' },
+        { ...availableGroups[1], id: 91, name: 'Shared group 91', subscription_type: 'standard', status: 'active' },
       ])
       const wrapper = await openCreate()
+      await chooseProvider(wrapper, 'openai')
       const toggle = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('keys.groupBindings.toggle'))
       expect(toggle).toBeDefined()
       await toggle!.setValue(true)
-      expect(wrapper.text()).toContain('Shared group 2')
-      expect(wrapper.text()).toContain('Shared group 90')
-      expect(wrapper.text()).not.toContain('Shared group 91')
+      const bindingLabels = wrapper.findAll('input[type="checkbox"]').map((input) => input.element.parentElement?.textContent?.trim() ?? '')
+      expect(bindingLabels).toContain('Shared group 2')
+      expect(bindingLabels).toContain('Shared group 91')
+      expect(bindingLabels).not.toContain('Shared group 90')
     })
 
     it('requires a binding and submits the lowest-priority binding as the legacy group', async () => {
       const eligible = [
-        { ...availableGroups[1], id: 30, subscription_type: 'subscription', status: 'active' },
-        { ...availableGroups[1], id: 31, subscription_type: 'subscription', status: 'active' },
+        { ...availableGroups[1], id: 30, name: 'Shared group 30', subscription_type: 'subscription', status: 'active' },
+        { ...availableGroups[1], id: 31, name: 'Shared group 31', subscription_type: 'subscription', status: 'active' },
       ]
       getAvailableGroups.mockResolvedValue([...availableGroups, ...eligible])
       const wrapper = await openCreate()
@@ -635,10 +637,18 @@ describe('user KeysView column settings', () => {
       }))
     })
 
+    it('does not expose multi-group routing for other providers', async () => {
+      const wrapper = await openCreate()
+      await chooseProvider(wrapper, 'anthropic')
+      expect(wrapper.find('#key-group-bindings-label').exists()).toBe(false)
+      await chooseProvider(wrapper, 'openai')
+      expect(wrapper.find('#key-group-bindings-label').exists()).toBe(true)
+    })
+
     it('clears bindings when multi-group mode is turned off', async () => {
       getAvailableGroups.mockResolvedValue([
         ...availableGroups,
-        { ...availableGroups[1], id: 30, subscription_type: 'subscription', status: 'active' },
+        { ...availableGroups[1], id: 30, name: 'Shared group 30', subscription_type: 'subscription', status: 'active' },
       ])
       const wrapper = await openCreate()
       await wrapper.get('[data-tour="key-form-name"]').setValue('Legacy key')

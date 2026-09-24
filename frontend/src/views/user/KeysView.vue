@@ -580,7 +580,7 @@
           </Select>
         </div>
 
-        <section class="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-dark-600" aria-labelledby="key-group-bindings-label">
+        <section v-if="canConfigureGroupBindings" class="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-dark-600" aria-labelledby="key-group-bindings-label">
           <label id="key-group-bindings-label" class="flex items-center gap-2 text-sm font-medium">
             <input :checked="formData.group_bindings_enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="setGroupBindingsEnabled(($event.target as HTMLInputElement).checked)" />
             {{ t('keys.groupBindings.toggle') }}
@@ -1563,7 +1563,10 @@ const formGroupOptions = computed(() => showEditModal.value
   ? groupOptions.value
   : groupOptions.value.filter((group) => getKeyGroupProvider(group.platform) === createProvider.value)
 )
-const eligibleBindingGroups = computed(() => groups.value.filter((group) => group.platform === 'openai' && group.subscription_type === 'subscription' && group.status === 'active'))
+const canConfigureGroupBindings = computed(() => formData.value.group_bindings_enabled || (showEditModal.value
+  ? groups.value.some((group) => group.id === formData.value.group_id && group.platform === 'openai')
+  : createProvider.value === 'openai'))
+const eligibleBindingGroups = computed(() => groups.value.filter((group) => group.platform === 'openai' && group.status === 'active'))
 const hasGroupBinding = (groupId: number) => formData.value.group_bindings.some((binding) => binding.group_id === groupId)
 const bindingPriority = (groupId: number) => formData.value.group_bindings.find((binding) => binding.group_id === groupId)?.priority ?? 1
 const bindingCooldown = (groupId: number) => formData.value.group_bindings.find((binding) => binding.group_id === groupId)?.cooldown_seconds ?? 0
@@ -1594,6 +1597,7 @@ const selectCreateProvider = (provider: KeyGroupProvider) => {
   if (createProvider.value === provider) return
   createProvider.value = provider
   formData.value.group_id = null
+  if (provider !== 'openai') setGroupBindingsEnabled(false)
 }
 
 // Also handles groups arriving after the create dialog has already opened.

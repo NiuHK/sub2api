@@ -68,6 +68,10 @@ func (h *OpenAIGatewayHandler) chatCompletionsWithGroupBindings(c *gin.Context, 
 		if failoverClientGone(c) {
 			return
 		}
+		if candidate.UserLimitErr != nil {
+			h.openAIGroupBindingIneligibleError(c, &openAIGroupBindingIneligibleError{Reason: openAIGroupBindingUserLimitExceeded, Cause: candidate.UserLimitErr})
+			return
+		}
 		attemptKey := *candidate.APIKey
 		attemptKey.GroupBindingsEnabled = false
 		attemptKey.GroupBindings = nil
@@ -81,16 +85,16 @@ func (h *OpenAIGatewayHandler) chatCompletionsWithGroupBindings(c *gin.Context, 
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 		h.chatCompletionsSingle(c)
 		c.Request = c.Request.WithContext(originalRequestContext)
-		c.Delete(openAIChatGroupRetryContextKey)
+		delete(c.Keys, openAIChatGroupRetryContextKey)
 		if hadKey {
 			c.Set(string(middleware2.ContextKeyAPIKey), previousKey)
 		} else {
-			c.Delete(string(middleware2.ContextKeyAPIKey))
+			delete(c.Keys, string(middleware2.ContextKeyAPIKey))
 		}
 		if hadSubscription {
 			c.Set(string(middleware2.ContextKeySubscription), previousSubscription)
 		} else {
-			c.Delete(string(middleware2.ContextKeySubscription))
+			delete(c.Keys, string(middleware2.ContextKeySubscription))
 		}
 		if !state.Retry || c.Writer.Size() != state.WriterSize {
 			return
@@ -112,6 +116,12 @@ func (h *OpenAIGatewayHandler) openAIGroupBindingIneligibleError(c *gin.Context,
 	switch err.Reason {
 	case openAIGroupBindingModelNotAllowed:
 		h.errorResponse(c, http.StatusNotFound, "model_not_found", "The requested model is not available in any bound group")
+	case openAIGroupBindingUserLimitExceeded:
+		message := "Subscription usage limit exceeded"
+		if err.Cause != nil {
+			message = err.Cause.Error()
+		}
+		h.errorResponse(c, http.StatusTooManyRequests, "usage_limit_exceeded", message)
 	case openAIGroupBindingBillingIneligible:
 		status, code, message, retryAfter := billingErrorDetails(err.Cause)
 		if retryAfter > 0 {

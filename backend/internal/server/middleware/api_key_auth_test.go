@@ -39,7 +39,7 @@ func TestShouldDeferPrimaryGroupValidation(t *testing.T) {
 	}
 	nonSubscription := &service.APIKey{
 		GroupBindingsEnabled: true,
-		Group: &service.Group{Platform: service.PlatformOpenAI},
+		Group:                &service.Group{Platform: service.PlatformOpenAI},
 	}
 	for _, tt := range []struct {
 		name string
@@ -50,11 +50,37 @@ func TestShouldDeferPrimaryGroupValidation(t *testing.T) {
 		{name: "enabled binding key endpoint", key: multi, path: "/v1/chat/completions", want: true},
 		{name: "legacy key endpoint", key: legacy, path: "/v1/chat/completions", want: false},
 		{name: "non-openai group", key: nonOpenAI, path: "/v1/chat/completions", want: false},
-		{name: "non-subscription group", key: nonSubscription, path: "/v1/chat/completions", want: false},
+		{name: "non-subscription group", key: nonSubscription, path: "/v1/chat/completions", want: true},
 		{name: "enabled binding key other endpoint", key: multi, path: "/v1/embeddings", want: false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, shouldDeferPrimaryGroupValidation(tt.key, http.MethodPost, tt.path))
+		})
+	}
+}
+
+func TestUnsupportedMultiGroupAPIKeyEndpoint(t *testing.T) {
+	multi := &service.APIKey{GroupBindingsEnabled: true, Group: &service.Group{Platform: service.PlatformOpenAI, SubscriptionType: service.SubscriptionTypeSubscription}}
+	legacy := &service.APIKey{}
+	for _, tt := range []struct {
+		name   string
+		key    *service.APIKey
+		method string
+		path   string
+		want   bool
+	}{
+		{"multi chat", multi, http.MethodPost, "/v1/chat/completions", false},
+		{"multi responses", multi, http.MethodPost, "/v1/responses", false},
+		{"multi embeddings", multi, http.MethodPost, "/v1/embeddings", true},
+		{"multi responses subpath", multi, http.MethodPost, "/v1/responses/input_tokens", true},
+		{"multi messages", multi, http.MethodPost, "/v1/messages", true},
+		{"invalid platform", &service.APIKey{GroupBindingsEnabled: true, Group: &service.Group{Platform: service.PlatformAnthropic, SubscriptionType: service.SubscriptionTypeSubscription}}, http.MethodPost, "/v1/responses", true},
+		{"standard group", &service.APIKey{GroupBindingsEnabled: true, Group: &service.Group{Platform: service.PlatformOpenAI}}, http.MethodPost, "/v1/responses", false},
+		{"multi read", multi, http.MethodGet, "/v1/models", false},
+		{"legacy embeddings", legacy, http.MethodPost, "/v1/embeddings", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, unsupportedMultiGroupAPIKeyEndpoint(tt.key, tt.method, tt.path))
 		})
 	}
 }
@@ -332,6 +358,31 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		require.Equal(t, http.StatusTooManyRequests, w.Code)
 		require.Contains(t, w.Body.String(), "USAGE_LIMIT_EXCEEDED")
 	})
+}
+
+func TestAPIKeyAuthRejectsUnsupportedMultiGroupPostBeforeHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	group := &service.Group{ID: 11, Status: service.StatusActive, Platform: service.PlatformOpenAI, SubscriptionType: service.SubscriptionTypeSubscription, Hydrated: true}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive}
+	key := &service.APIKey{ID: 5, UserID: user.ID, Key: "test-key", Status: service.StatusActive,
+		User: user, Group: group, GroupID: &group.ID, GroupBindingsEnabled: true}
+	repo := &stubApiKeyRepo{getByKey: func(_ context.Context, credential string) (*service.APIKey, error) {
+		if credential != key.Key {
+			return nil, service.ErrAPIKeyNotFound
+		}
+		return key, nil
+	}}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
+	router.POST("/v1/embeddings", func(c *gin.Context) { c.Status(http.StatusOK) })
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/embeddings", nil)
+	request.Header.Set("x-api-key", key.Key)
+	router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.Contains(t, response.Body.String(), "MULTI_GROUP_ENDPOINT_UNSUPPORTED")
 }
 
 func TestAPIKeyAuthSetsGroupContext(t *testing.T) {

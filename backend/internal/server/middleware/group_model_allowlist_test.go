@@ -80,9 +80,9 @@ func (b *readTrackingBody) Close() error { return nil }
 
 func TestGroupModelAllowlistDefersBoundOpenAIEndpointsOnly(t *testing.T) {
 	for _, tt := range []struct {
-		name            string
-		path            string
-		bindingsEnabled bool
+		name             string
+		path             string
+		bindingsEnabled  bool
 		platform         string
 		subscriptionType string
 		wantStatus       int
@@ -92,7 +92,7 @@ func TestGroupModelAllowlistDefersBoundOpenAIEndpointsOnly(t *testing.T) {
 		{name: "legacy key chat", path: "/v1/chat/completions", platform: service.PlatformOpenAI, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusNotFound},
 		{name: "other endpoint", path: "/v1/embeddings", bindingsEnabled: true, platform: service.PlatformOpenAI, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusNotFound},
 		{name: "non-openai group", path: "/v1/chat/completions", bindingsEnabled: true, platform: service.PlatformAnthropic, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusNotFound},
-		{name: "non-subscription group", path: "/v1/chat/completions", bindingsEnabled: true, platform: service.PlatformOpenAI, wantStatus: http.StatusNotFound},
+		{name: "standard group", path: "/v1/chat/completions", bindingsEnabled: true, platform: service.PlatformOpenAI, wantStatus: http.StatusOK},
 		{name: "responses subpath", path: "/v1/responses/input_tokens", bindingsEnabled: true, platform: service.PlatformOpenAI, subscriptionType: service.SubscriptionTypeSubscription, wantStatus: http.StatusNotFound},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

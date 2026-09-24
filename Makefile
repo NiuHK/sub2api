@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical deploy deploy-down deploy-status deploy-logs
+.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical deploy deploy-backup deploy-current deploy-down deploy-status deploy-logs
 
 FRONTEND_CRITICAL_VITEST := \
 	src/i18n/__tests__/localeKeyCompleteness.spec.ts \
@@ -51,6 +51,16 @@ test-frontend-critical:
 # Build the current source and deploy it behind the host Caddy at api2.pinellia.uk.
 deploy:
 	@bash deploy/local-deploy.sh
+
+# Switch only the app container; keep PostgreSQL, Redis, volumes and Caddy intact.
+# The preserved image is tagged once before the first source upgrade.
+deploy-backup:
+	@docker image inspect sub2api-local:backup-before-group-routing >/dev/null
+	@docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.source.yml -f deploy/docker-compose.backup.yml up -d --no-deps --no-build --force-recreate --wait --wait-timeout 180 sub2api
+
+deploy-current:
+	@docker image inspect sub2api-local:latest >/dev/null
+	@docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.source.yml up -d --no-deps --no-build --force-recreate --wait --wait-timeout 180 sub2api
 
 deploy-down:
 	@docker compose --env-file deploy/.env -f deploy/docker-compose.yml -f deploy/docker-compose.source.yml down

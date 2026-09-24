@@ -47,6 +47,10 @@ func (h *OpenAIGatewayHandler) responsesWithGroupBindings(c *gin.Context, origin
 		if failoverClientGone(c) {
 			return
 		}
+		if candidate.UserLimitErr != nil {
+			h.openAIGroupBindingIneligibleError(c, &openAIGroupBindingIneligibleError{Reason: openAIGroupBindingUserLimitExceeded, Cause: candidate.UserLimitErr})
+			return
+		}
 		attemptKey := *candidate.APIKey
 		attemptKey.GroupBindingsEnabled = false
 		attemptKey.GroupBindings = nil
@@ -60,16 +64,16 @@ func (h *OpenAIGatewayHandler) responsesWithGroupBindings(c *gin.Context, origin
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 		h.responsesSingle(c)
 		c.Request = c.Request.WithContext(originalCtx)
-		c.Delete(openAIChatGroupRetryContextKey)
+		delete(c.Keys, openAIChatGroupRetryContextKey)
 		if hadKey {
 			c.Set(string(middleware2.ContextKeyAPIKey), previousKey)
 		} else {
-			c.Delete(string(middleware2.ContextKeyAPIKey))
+			delete(c.Keys, string(middleware2.ContextKeyAPIKey))
 		}
 		if hadSubscription {
 			c.Set(string(middleware2.ContextKeySubscription), previousSubscription)
 		} else {
-			c.Delete(string(middleware2.ContextKeySubscription))
+			delete(c.Keys, string(middleware2.ContextKeySubscription))
 		}
 		if !state.Retry || c.Writer.Size() != state.WriterSize {
 			return

@@ -15,6 +15,7 @@ type openAIGroupBindingIneligibleReason string
 const (
 	openAIGroupBindingModelNotAllowed     openAIGroupBindingIneligibleReason = "model_not_allowed"
 	openAIGroupBindingSubscriptionInvalid openAIGroupBindingIneligibleReason = "subscription_invalid"
+	openAIGroupBindingUserLimitExceeded   openAIGroupBindingIneligibleReason = "user_limit_exceeded"
 	openAIGroupBindingBillingIneligible   openAIGroupBindingIneligibleReason = "billing_ineligible"
 )
 
@@ -45,6 +46,7 @@ type openAIGroupBindingCandidate struct {
 	APIKey       *service.APIKey
 	Group        *service.Group
 	Subscription *service.UserSubscription
+	UserLimitErr error
 }
 
 // resolveOpenAIGroupBindingCandidates validates each configured binding independently.
@@ -76,50 +78,66 @@ func (h *OpenAIGatewayHandler) resolveOpenAIGroupBindingCandidates(ctx context.C
 			rememberIneligible(openAIGroupBindingSubscriptionInvalid, nil)
 			continue
 		}
-		if !group.IsActive() || group.Platform != service.PlatformOpenAI || group.SubscriptionType != service.SubscriptionTypeSubscription {
+		if !group.IsActive() || group.Platform != service.PlatformOpenAI {
 			rememberIneligible(openAIGroupBindingSubscriptionInvalid, nil)
 			continue
 		}
-		subscription, err := h.subscriptionService.GetActiveSubscription(ctx, apiKey.UserID, group.ID)
-		if err != nil {
-			if isOpenAIGroupBindingMissingSubscription(err) {
-				rememberIneligible(openAIGroupBindingSubscriptionInvalid, err)
+		if !group.IsSubscriptionType() && !apiKey.User.CanBindGroup(group.ID, group.IsExclusive) {
+			rememberIneligible(openAIGroupBindingSubscriptionInvalid, nil)
+			continue
+		}
+		var subscription *service.UserSubscription
+		var userLimitErr error
+		if group.IsSubscriptionType() {
+			subscription, err = h.subscriptionService.GetActiveSubscription(ctx, apiKey.UserID, group.ID)
+			if err != nil {
+				if isOpenAIGroupBindingMissingSubscription(err) {
+					rememberIneligible(openAIGroupBindingSubscriptionInvalid, err)
+					continue
+				}
+				return nil, fmt.Errorf("resolve subscription for group binding %d: %w", binding.GroupID, err)
+			}
+			if subscription == nil {
+				rememberIneligible(openAIGroupBindingSubscriptionInvalid, nil)
 				continue
 			}
-			return nil, fmt.Errorf("resolve subscription for group binding %d: %w", binding.GroupID, err)
-		}
-		if subscription == nil {
-			rememberIneligible(openAIGroupBindingSubscriptionInvalid, nil)
-			continue
+			needsMaintenance, checkErr := h.subscriptionService.ValidateAndCheckLimits(subscription, group)
+			if checkErr != nil {
+				if !isOpenAIGroupBindingUserLimitExceeded(checkErr) {
+					rememberIneligible(openAIGroupBindingSubscriptionInvalid, checkErr)
+					continue
+				}
+				// Do not reject a request because a lower-priority, untried
+				// group is exhausted. Stop only when this group is attempted.
+				userLimitErr = checkErr
+			}
+			if needsMaintenance {
+				subscription, err = h.subscriptionService.EnsureWindowMaintenance(ctx, subscription)
+				if err != nil {
+					return nil, fmt.Errorf("maintain subscription for group binding %d: %w", binding.GroupID, err)
+				}
+				userLimitErr = nil
+				if _, err = h.subscriptionService.ValidateAndCheckLimits(subscription, group); err != nil {
+					if !isOpenAIGroupBindingUserLimitExceeded(err) {
+						rememberIneligible(openAIGroupBindingSubscriptionInvalid, err)
+						continue
+					}
+					userLimitErr = err
+				}
+			}
 		}
 		if group.ModelAllowlistEnabled() && !group.ModelAllowlist.Allows(model) {
 			rememberIneligible(openAIGroupBindingModelNotAllowed, nil)
 			continue
 		}
-		needsMaintenance, err := h.subscriptionService.ValidateAndCheckLimits(subscription, group)
-		if err != nil {
-			rememberIneligible(openAIGroupBindingSubscriptionInvalid, err)
-			continue
-		}
-		if needsMaintenance {
-			subscription, err = h.subscriptionService.EnsureWindowMaintenance(ctx, subscription)
-			if err != nil {
-				return nil, fmt.Errorf("maintain subscription for group binding %d: %w", binding.GroupID, err)
-			}
-			if _, err = h.subscriptionService.ValidateAndCheckLimits(subscription, group); err != nil {
-				rememberIneligible(openAIGroupBindingSubscriptionInvalid, err)
-				continue
-			}
-		}
 		candidateKey := *apiKey
 		candidateKey.GroupID = new(int64)
 		*candidateKey.GroupID = group.ID
 		candidateKey.Group = group
-		if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, &candidateKey, group, subscription, service.QuotaPlatform(ctx, &candidateKey)); err != nil {
-			rememberIneligible(openAIGroupBindingBillingIneligible, err)
-			continue
-		}
-		candidate := openAIGroupBindingCandidate{Binding: binding, APIKey: &candidateKey, Group: group, Subscription: subscription}
+		// Billing eligibility (including RPM) is checked by the single-group
+		// handler only for the candidate actually attempted. Preflighting it
+		// here would consume RPM for untried groups and double count attempts.
+		candidate := openAIGroupBindingCandidate{Binding: binding, APIKey: &candidateKey, Group: group, Subscription: subscription, UserLimitErr: userLimitErr}
 		isCooling, _ := h.apiKeyService.IsGroupBindingCoolingDown(ctx, apiKey.ID, group.ID)
 		if isCooling {
 			cooling = append(cooling, candidate)
@@ -135,6 +153,12 @@ func (h *OpenAIGatewayHandler) resolveOpenAIGroupBindingCandidates(ctx context.C
 		return nil, firstIneligible
 	}
 	return prioritized, nil
+}
+
+func isOpenAIGroupBindingUserLimitExceeded(err error) bool {
+	return errors.Is(err, service.ErrDailyLimitExceeded) ||
+		errors.Is(err, service.ErrWeeklyLimitExceeded) ||
+		errors.Is(err, service.ErrMonthlyLimitExceeded)
 }
 
 func isOpenAIGroupBindingMissingGroup(err error) bool {

@@ -166,6 +166,12 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				return
 			}
 		}
+		// Fail closed for billable endpoints that cannot route to the selected group;
+		// otherwise they would silently use the binding's primary group.
+		if unsupportedMultiGroupAPIKeyEndpoint(apiKey, c.Request.Method, c.Request.URL.Path) {
+			AbortWithError(c, http.StatusBadRequest, "MULTI_GROUP_ENDPOINT_UNSUPPORTED", "Multi-group routing is not supported for this endpoint")
+			return
+		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
 		c.Request = c.Request.WithContext(ctx)
 		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
@@ -336,9 +342,14 @@ func isOpenAICompatibleAPIKeyRequest(c *gin.Context) bool {
 	return false
 }
 
+func unsupportedMultiGroupAPIKeyEndpoint(apiKey *service.APIKey, method, path string) bool {
+	return apiKey != nil && apiKey.GroupBindingsEnabled && method == http.MethodPost &&
+		!shouldDeferPrimaryGroupValidation(apiKey, method, path)
+}
+
 func shouldDeferPrimaryGroupValidation(apiKey *service.APIKey, method, path string) bool {
 	return apiKey != nil && apiKey.GroupBindingsEnabled && apiKey.Group != nil &&
-		apiKey.Group.Platform == service.PlatformOpenAI && apiKey.Group.IsSubscriptionType() &&
+		apiKey.Group.Platform == service.PlatformOpenAI &&
 		isMultiGroupAPIKeyEndpoint(method, path)
 }
 
