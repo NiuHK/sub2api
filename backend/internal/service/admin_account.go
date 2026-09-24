@@ -532,14 +532,30 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err := s.ValidateAccountGroupBindings(ctx, groupIDs); err != nil {
 		return nil, err
 	}
-	if err := s.accountRepo.Create(ctx, account); err != nil {
-		return nil, err
-	}
-
-	// 绑定分组
-	if len(groupIDs) > 0 {
-		if err := s.accountRepo.BindGroups(ctx, account.ID, groupIDs); err != nil {
+	if input.AtomicGroupBind {
+		// User-owned accounts must never be left unbound if the second insert fails.
+		creator, ok := s.accountRepo.(interface {
+			CreateWithAccountGroups(context.Context, *Account, []AccountGroup) error
+		})
+		if !ok {
+			return nil, errors.New("atomic account group creation is unavailable")
+		}
+		bindings := make([]AccountGroup, 0, len(groupIDs))
+		for i, id := range groupIDs {
+			bindings = append(bindings, AccountGroup{GroupID: id, Priority: i + 1})
+		}
+		if err := creator.CreateWithAccountGroups(ctx, account, bindings); err != nil {
 			return nil, err
+		}
+	} else {
+		if err := s.accountRepo.Create(ctx, account); err != nil {
+			return nil, err
+		}
+		// 绑定分组（保持管理员接口原有行为）。
+		if len(groupIDs) > 0 {
+			if err := s.accountRepo.BindGroups(ctx, account.ID, groupIDs); err != nil {
+				return nil, err
+			}
 		}
 	}
 

@@ -72,6 +72,19 @@ func RegisterUserRoutes(
 			}
 		}
 
+		// Private OpenAI upstream accounts. Never expose admin account handlers here.
+		privateAccounts := authenticated.Group("/private-accounts")
+		{
+			privateAccounts.GET("", h.PrivateAccount.List)
+			privateAccounts.POST("", h.PrivateAccount.Create)
+			privateAccounts.POST("/codex-pat", h.PrivateAccount.CreatePAT)
+			privateAccounts.POST("/oauth/auth-url", h.PrivateAccount.GenerateOAuthURL)
+			privateAccounts.POST("/oauth/create", h.PrivateAccount.CreateOAuth)
+			privateAccounts.GET("/:id", h.PrivateAccount.Get)
+			privateAccounts.PUT("/:id", h.PrivateAccount.Update)
+			privateAccounts.DELETE("/:id", h.PrivateAccount.Delete)
+		}
+
 		// API Key管理
 		keys := authenticated.Group("/keys")
 		{

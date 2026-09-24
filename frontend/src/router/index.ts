@@ -216,6 +216,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/private-accounts',
+    name: 'PrivateAccounts',
+    component: () => import('@/views/user/PrivateAccountsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'OpenAI Accounts',
+      titleKey: 'nav.accounts'
+    }
+  },
+  {
     path: '/batch-image',
     name: 'BatchImageGuide',
     alias: '/docs/batch-image',

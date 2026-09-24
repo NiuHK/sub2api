@@ -409,6 +409,8 @@ type CreateAccountInput struct {
 	ExpiresAt          *int64
 	AutoPauseOnExpired *bool
 	ProbeEnabled       *bool
+	// AtomicGroupBind requires account and its group binding to commit together.
+	AtomicGroupBind bool
 	// SkipDefaultGroupBind prevents auto-binding to platform default group when GroupIDs is empty.
 	SkipDefaultGroupBind bool
 	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
