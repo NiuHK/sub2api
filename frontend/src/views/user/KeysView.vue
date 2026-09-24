@@ -535,49 +535,14 @@
 
         <div v-if="!formData.group_bindings_enabled">
           <label class="input-label" for="key-form-group">{{ t('keys.groupLabel') }}</label>
-          <Select
+          <KeyGroupSelect
             :key="showEditModal ? 'edit' : createProvider"
             id="key-form-group"
             :aria-label="t('keys.groupLabel')"
             v-model="formData.group_id"
             :options="formGroupOptions"
-            :placeholder="t('keys.selectGroup')"
-            :empty-text="t('common.noGroupsAvailable')"
-            :searchable="true"
-            :search-placeholder="t('keys.searchGroup')"
             data-tour="key-form-group"
-          >
-            <template #selected="{ option }">
-              <GroupBadge
-                v-if="option"
-                :name="(option as unknown as GroupOption).label"
-                :platform="(option as unknown as GroupOption).platform"
-                :subscription-type="(option as unknown as GroupOption).subscriptionType"
-                :rate-multiplier="(option as unknown as GroupOption).rate"
-                :user-rate-multiplier="(option as unknown as GroupOption).userRate"
-                :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
-                :peak-start="(option as unknown as GroupOption).peakStart"
-                :peak-end="(option as unknown as GroupOption).peakEnd"
-                :peak-rate-multiplier="(option as unknown as GroupOption).peakRateMultiplier"
-              />
-              <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
-            </template>
-            <template #option="{ option, selected }">
-              <GroupOptionItem
-                :name="(option as unknown as GroupOption).label"
-                :platform="(option as unknown as GroupOption).platform"
-                :subscription-type="(option as unknown as GroupOption).subscriptionType"
-                :rate-multiplier="(option as unknown as GroupOption).rate"
-                :user-rate-multiplier="(option as unknown as GroupOption).userRate"
-                :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
-                :peak-start="(option as unknown as GroupOption).peakStart"
-                :peak-end="(option as unknown as GroupOption).peakEnd"
-                :peak-rate-multiplier="(option as unknown as GroupOption).peakRateMultiplier"
-                :description="(option as unknown as GroupOption).description"
-                :selected="selected"
-              />
-            </template>
-          </Select>
+          />
         </div>
 
         <section v-if="canConfigureGroupBindings" class="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-dark-600" aria-labelledby="key-group-bindings-label">
@@ -593,11 +558,13 @@
                 <button type="button" class="rounded p-1 text-sm text-red-500 hover:text-red-600" @click="formData.group_bindings.splice(index, 1)">{{ t('keys.groupBindings.remove') }}</button>
               </div>
               <div>
-                <select v-model.number="binding.group_id" class="input w-full" :aria-label="t('keys.groupBindings.groupFor', { index: index + 1 })">
-                  <option :value="0">{{ t('keys.groupBindings.chooseGroup') }}</option>
-                  <option v-if="binding.group_id && !eligibleBindingGroups.some(group => group.id === binding.group_id)" :value="binding.group_id" disabled>{{ t('keys.groupBindings.unavailable', { id: binding.group_id }) }}</option>
-                  <option v-for="group in eligibleBindingGroups.filter(group => group.id === binding.group_id || !formData.group_bindings.some(other => other.group_id === group.id))" :key="group.id" :value="group.id">{{ group.name }}</option>
-                </select>
+                <KeyGroupSelect
+                  :model-value="binding.group_id || null"
+                  :options="bindingGroupOptions(binding.group_id)"
+                  :unavailable-id="binding.group_id"
+                  :aria-label="t('keys.groupBindings.groupFor', { index: index + 1 })"
+                  @update:model-value="binding.group_id = $event ?? 0"
+                />
               </div>
               <p v-if="binding.group_id && !eligibleBindingGroups.some(group => group.id === binding.group_id)" class="text-xs text-amber-600">{{ t('keys.groupBindings.unavailableHint') }}</p>
               <div class="flex flex-wrap gap-3">
@@ -1258,7 +1225,8 @@ import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-	import type { ApiKey, ApiKeyGroupBinding, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'
+import KeyGroupSelect from '@/components/keys/KeyGroupSelect.vue'
+	import type { ApiKey, ApiKeyGroupBinding, Group, PublicSettings, UpdateApiKeyRequest } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
@@ -1276,20 +1244,6 @@ const formatDateTimeLocal = (isoDate: string): string => {
   const date = new Date(isoDate)
   const pad = (n: number) => n.toString().padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-interface GroupOption {
-  value: number
-  label: string
-  description: string | null
-  rate: number
-  userRate: number | null
-  peakRateEnabled: boolean
-  peakStart: string
-  peakEnd: string
-  peakRateMultiplier: number
-  subscriptionType: SubscriptionType
-  platform: GroupPlatform
 }
 
 const appStore = useAppStore()
@@ -1578,6 +1532,10 @@ const canConfigureGroupBindings = computed(() => formData.value.group_bindings_e
   ? groups.value.some((group) => group.id === formData.value.group_id && group.platform === 'openai')
   : createProvider.value === 'openai'))
 const eligibleBindingGroups = computed(() => groups.value.filter((group) => group.platform === 'openai' && group.status === 'active'))
+const bindingGroupOptions = (currentId: number) => groupOptions.value.filter((option) =>
+  eligibleBindingGroups.value.some((group) => group.id === option.value) &&
+  (option.value === currentId || !formData.value.group_bindings.some((binding) => binding.group_id === option.value))
+)
 const addGroupBinding = () => {
   formData.value.group_bindings.push({ group_id: 0, priority: 100, cooldown_seconds: 30 })
 }

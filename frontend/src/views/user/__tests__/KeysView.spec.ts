@@ -5,6 +5,7 @@ import { nextTick } from 'vue'
 import type { ApiKey } from '@/types'
 import { keysAPI } from '@/api'
 import KeysView from '../KeysView.vue'
+import KeyGroupSelect from '@/components/keys/KeyGroupSelect.vue'
 
 const {
   listKeys,
@@ -582,12 +583,18 @@ describe('user KeysView column settings', () => {
       await chooseProvider(wrapper, 'openai')
       const toggle = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('keys.groupBindings.toggle'))
       expect(toggle).toBeDefined()
+      const normalOptions = groupSelect(wrapper).props('options')
       await toggle!.setValue(true)
       await wrapper.findAll('button').find((button) => button.text() === 'keys.groupBindings.add')!.trigger('click')
-      const options = wrapper.get('[data-testid="binding-card"] select').findAll('option').map((option) => option.text())
+      const cardSelect = wrapper.get('[data-testid="binding-card"]').findComponent(KeyGroupSelect)
+      const options = cardSelect.props('options').map((option) => option.label)
       expect(options).toContain('Shared group 2')
       expect(options).toContain('Shared group 91')
       expect(options).not.toContain('Shared group 90')
+      expect(cardSelect.props('options').find((option) => option.value === 91)).toEqual(
+        normalOptions.find((option: { value: number }) => option.value === 91)
+      )
+      expect(cardSelect.findComponent({ name: 'Select' }).exists()).toBe(true)
     })
 
     it('requires a binding and submits the lowest-priority binding as the legacy group', async () => {
@@ -612,8 +619,9 @@ describe('user KeysView column settings', () => {
       const cards = wrapper.findAll('[data-testid="binding-card"]')
       expect(cards[0].get('input[type="number"]').element.value).toBe('100')
       expect(cards[0].findAll('input[type="number"]')[1].element.value).toBe('30')
-      await cards[0].get('select').setValue('30')
-      await cards[1].get('select').setValue('31')
+      cards[0].findComponent(KeyGroupSelect).vm.$emit('update:modelValue', 30)
+      cards[1].findComponent(KeyGroupSelect).vm.$emit('update:modelValue', 31)
+      await nextTick()
       await wrapper.get('#key-form').trigger('submit')
       expect(showError).toHaveBeenCalledWith('keys.groupBindings.invalid')
       await cards[1].get('input[type="number"]').setValue(50)
@@ -694,7 +702,8 @@ describe('user KeysView column settings', () => {
       const enable = wrapper.findAll('input[type="checkbox"]').find((input) => input.element.parentElement?.textContent?.includes('keys.groupBindings.toggle'))!
       await enable.setValue(true)
       await wrapper.findAll('button').find((button) => button.text() === 'keys.groupBindings.add')!.trigger('click')
-      await wrapper.get('[data-testid="binding-card"] select').setValue('30')
+      wrapper.get('[data-testid="binding-card"]').findComponent(KeyGroupSelect).vm.$emit('update:modelValue', 30)
+      await nextTick()
       await enable.setValue(false)
       vi.mocked(keysAPI.create).mockResolvedValue(createApiKey())
       await wrapper.get('#key-form').trigger('submit')
