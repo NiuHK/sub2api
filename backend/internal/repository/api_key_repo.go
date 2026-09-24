@@ -763,7 +763,12 @@ func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) (
 
 func enabledBindingGroupPredicate(groupID int64) predicate.APIKey {
 	return apikey.And(apikey.GroupBindingsEnabledEQ(true), func(s *entsql.Selector) {
-		s.Where(entsql.ExprP("group_bindings @> ?::jsonb", fmt.Sprintf(`[{"group_id":%d}]`, groupID)))
+		s.Where(entsql.P(func(b *entsql.Builder) {
+			b.Ident(s.C(apikey.FieldGroupBindings))
+			b.WriteString(" @> ")
+			b.Arg(fmt.Sprintf(`[{"group_id":%d}]`, groupID))
+			b.WriteString("::jsonb")
+		}))
 	})
 }
 
