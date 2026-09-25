@@ -40,10 +40,18 @@ func TestEnsurePrivateOpenAISubscription(t *testing.T) {
 	require.NoError(t, err)
 	require.WithinDuration(t, time.Now().AddDate(0, 0, 1000), sub.ExpiresAt, time.Minute)
 	require.NoError(t, ensurePrivateOpenAISubscription(ctx, client, first.ID))
-	require.Equal(t, 1, client.UserSubscription.Query().CountX(ctx))
-	require.Equal(t, 1, client.Group.Query().CountX(ctx))
+	require.NoError(t, ensurePrivatePlatformSubscriptions(ctx, client, first.ID, []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini}))
+	for _, platform := range []string{PlatformAnthropic, PlatformGemini} {
+		privateGroup, lookupErr := client.Group.Query().Where(group.NameEQ(fmt.Sprintf("private-usr%d-%s", first.ID, platform))).Only(ctx)
+		require.NoError(t, lookupErr)
+		require.Equal(t, platform, privateGroup.Platform)
+		require.Equal(t, 1, client.UserSubscription.Query().Where(usersubscription.UserIDEQ(first.ID), usersubscription.GroupIDEQ(privateGroup.ID)).CountX(ctx))
+	}
+	require.NoError(t, ensurePrivatePlatformSubscriptions(ctx, client, first.ID, []string{PlatformOpenAI, PlatformAnthropic, PlatformGemini}))
+	require.Equal(t, 3, client.UserSubscription.Query().CountX(ctx))
+	require.Equal(t, 3, client.Group.Query().CountX(ctx))
 	require.NoError(t, ensurePrivateOpenAISubscription(ctx, client, second.ID))
-	require.Equal(t, 2, client.UserSubscription.Query().CountX(ctx))
+	require.Equal(t, 4, client.UserSubscription.Query().CountX(ctx))
 	// A second user's entitlement to the first private group must block reuse.
 	_, err = client.UserSubscription.Create().SetUserID(second.ID).SetGroupID(g.ID).
 		SetStartsAt(time.Now()).SetExpiresAt(time.Now().AddDate(0, 0, 1)).Save(ctx)

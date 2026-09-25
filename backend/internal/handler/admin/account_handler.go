@@ -658,6 +658,17 @@ func (h *AccountHandler) List(c *gin.Context) {
 	includeSchedulerScore := parseBoolQueryWithDefault(c.Query("include_scheduler_score"), false)
 
 	var groupID int64
+	var regularUser bool
+	var subject middleware.AuthSubject
+	if role, ok := middleware.GetUserRoleFromContext(c); ok && role != service.RoleAdmin {
+		regularUser = true
+		var subjectOK bool
+		subject, subjectOK = middleware.GetAuthSubjectFromContext(c)
+		if !subjectOK {
+			response.ErrorFrom(c, infraerrors.Unauthorized("UNAUTHORIZED", "Authorization required"))
+			return
+		}
+	}
 	if groupIDStr := c.Query("group"); groupIDStr != "" {
 		if groupIDStr == accountListGroupUngroupedQueryValue {
 			groupID = service.AccountListGroupUngrouped
@@ -675,28 +686,59 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 
-	if role, ok := middleware.GetUserRoleFromContext(c); ok && role != service.RoleAdmin {
-		subject, ok := middleware.GetAuthSubjectFromContext(c)
-		if !ok {
-			response.ErrorFrom(c, infraerrors.Unauthorized("UNAUTHORIZED", "Authorization required"))
+	var accounts []service.Account
+	var total int64
+	var err error
+	if regularUser {
+		var privateIDs []int64
+		for _, privatePlatform := range service.PrivateAccountPlatforms {
+			if platform != "" && platform != privatePlatform {
+				continue
+			}
+			privateID, lookupErr := h.privateGroupID(c, subject.UserID, privatePlatform)
+			if lookupErr != nil {
+				response.ErrorFrom(c, lookupErr)
+				return
+			}
+			if privateID != 0 {
+				privateIDs = append(privateIDs, privateID)
+			}
+			if privatePlatform == service.PlatformOpenAI {
+				groupID = privateID
+			} // scheduler score scope
+		}
+		// A group filter cannot widen the regular user's private set.
+		if requestedGroup := c.Query("group"); requestedGroup != "" {
+			filtered := privateIDs[:0]
+			for _, id := range privateIDs {
+				if requestedGroup == strconv.FormatInt(id, 10) {
+					filtered = append(filtered, id)
+				}
+			}
+			privateIDs = filtered
+		}
+		if len(privateIDs) == 0 {
+			response.Paginated(c, []AccountWithConcurrency{}, 0, page, pageSize)
 			return
 		}
-		var err error
-		groupID, err = h.privateGroupID(c, subject.UserID)
+		privateList, ok := h.adminService.(interface {
+			ListPrivateAccounts(context.Context, int, int, string, string, string, string, []int64, string, string, string) ([]service.Account, int64, error)
+		})
+		if !ok {
+			response.ErrorFrom(c, fmt.Errorf("private account list unavailable"))
+			return
+		}
+		accounts, total, err = privateList.ListPrivateAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, privateIDs, privacyMode, sortBy, sortOrder)
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return
 		}
-		if groupID == 0 {
-			response.Paginated(c, []AccountWithConcurrency{}, 0, page, pageSize)
+	} else {
+		accounts, total, err = h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+		if err != nil {
+			response.ErrorFrom(c, err)
 			return
 		}
-	}
-
-	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
 	}
 	if len(accounts) > 0 {
 		accountPointers := make([]*service.Account, len(accounts))

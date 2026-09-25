@@ -1000,8 +1000,8 @@ func (s *AuthService) postAuthUserBootstrap(ctx context.Context, user *User, sig
 	// Fail open: a provisioning error must not strand a successfully registered user;
 	// the idempotent operator tool can repair it by user ID.
 	if user.Role == RoleUser && s.entClient != nil {
-		if err := ensurePrivateOpenAISubscription(ctx, s.entClient, user.ID); err != nil {
-			logger.LegacyPrintf("service.auth", "[Auth] Failed to provision private OpenAI subscription: user_id=%d err=%v", user.ID, err)
+		if err := ensurePrivatePlatformSubscriptions(ctx, s.entClient, user.ID, PrivateAccountPlatforms); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to provision private platform subscriptions: user_id=%d err=%v", user.ID, err)
 		}
 	}
 

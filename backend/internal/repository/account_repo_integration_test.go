@@ -697,6 +697,38 @@ func (s *AccountRepoSuite) TestPreload_And_VirtualFields() {
 	s.Require().Equal(group.ID, accounts[0].GroupIDs[0])
 }
 
+func (s *AccountRepoSuite) TestListWithPrivateGroupIDs() {
+	ownOpenAI := mustCreateGroup(s.T(), s.client, &service.Group{Name: "private-test-openai", Platform: service.PlatformOpenAI})
+	ownAnthropic := mustCreateGroup(s.T(), s.client, &service.Group{Name: "private-test-anthropic", Platform: service.PlatformAnthropic})
+	foreign := mustCreateGroup(s.T(), s.client, &service.Group{Name: "private-test-foreign", Platform: service.PlatformAnthropic})
+	for _, item := range []struct {
+		name, platform string
+		groupID        int64
+	}{
+		{"alpha", service.PlatformOpenAI, ownOpenAI.ID},
+		{"beta", service.PlatformAnthropic, ownAnthropic.ID},
+		{"hidden", service.PlatformAnthropic, foreign.ID},
+	} {
+		account := mustCreateAccount(s.T(), s.client, &service.Account{Name: item.name, Platform: item.platform})
+		s.Require().NoError(s.repo.BindGroups(s.ctx, account.ID, []int64{item.groupID}))
+	}
+	ids := []int64{ownOpenAI.ID, ownAnthropic.ID}
+	accounts, result, err := s.repo.ListWithPrivateGroupIDs(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 1, SortBy: "name"}, "", "", "", "", ids, "")
+	s.Require().NoError(err)
+	s.Require().Equal(int64(2), result.Total)
+	s.Require().Len(accounts, 1)
+	s.Require().Equal("alpha", accounts[0].Name)
+	accounts, result, err = s.repo.ListWithPrivateGroupIDs(s.ctx, pagination.PaginationParams{Page: 2, PageSize: 1, SortBy: "name"}, "", "", "", "", ids, "")
+	s.Require().NoError(err)
+	s.Require().Equal(int64(2), result.Total)
+	s.Require().Len(accounts, 1)
+	s.Require().Equal("beta", accounts[0].Name)
+	accounts, result, err = s.repo.ListWithPrivateGroupIDs(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 20}, service.PlatformAnthropic, "", "", "", ids, "")
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), result.Total)
+	s.Require().Equal("beta", accounts[0].Name)
+}
+
 // --- GroupBinding / AddToGroup / RemoveFromGroup / BindGroups / GetGroups ---
 
 func (s *AccountRepoSuite) TestGroupBinding_And_BindGroups() {

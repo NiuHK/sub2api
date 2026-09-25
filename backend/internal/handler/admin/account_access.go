@@ -13,8 +13,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *AccountHandler) privateGroupID(c *gin.Context, userID int64) (int64, error) {
+func (h *AccountHandler) privateGroupID(c *gin.Context, userID int64, platform string) (int64, error) {
 	name := "private-usr" + strconv.FormatInt(userID, 10)
+	if platform != "" && platform != service.PlatformOpenAI {
+		name += "-" + platform
+	}
 	groups, _, err := h.adminService.ListGroups(c.Request.Context(), 1, 10000, "", "", name, nil, "", "")
 	if err != nil {
 		return 0, err
@@ -79,12 +82,7 @@ func (h *AccountHandler) GuardUserAccountAccess(c *gin.Context) {
 			return
 		}
 		c.Request.Body = io.NopCloser(bytes.NewReader(raw))
-		groupID, err := h.privateGroupID(c, subject.UserID)
-		if err != nil {
-			middleware.AbortWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load private group")
-			return
-		}
-		if groupID == 0 || !h.ownsAccounts(c, body.AccountIDs, groupID) {
+		if !h.ownsAccounts(c, body.AccountIDs, subject.UserID) {
 			return
 		}
 		c.Next()
@@ -101,12 +99,7 @@ func (h *AccountHandler) GuardUserAccountAccess(c *gin.Context) {
 			middleware.AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Account access denied")
 			return
 		}
-		groupID, err := h.privateGroupID(c, subject.UserID)
-		if err != nil {
-			middleware.AbortWithError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load private group")
-			return
-		}
-		if groupID == 0 || !h.ownsAccounts(c, []int64{id}, groupID) {
+		if !h.ownsAccounts(c, []int64{id}, subject.UserID) {
 			return
 		}
 		c.Next()
@@ -133,10 +126,15 @@ func (h *AccountHandler) GuardUserAccountAccess(c *gin.Context) {
 	middleware.AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Account access denied")
 }
 
-func (h *AccountHandler) ownsAccounts(c *gin.Context, ids []int64, groupID int64) bool {
+func (h *AccountHandler) ownsAccounts(c *gin.Context, ids []int64, userID int64) bool {
 	for _, id := range ids {
 		account, err := h.adminService.GetAccount(c.Request.Context(), id)
 		if err != nil {
+			middleware.AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Account access denied")
+			return false
+		}
+		groupID, err := h.privateGroupID(c, userID, account.Platform)
+		if err != nil || groupID == 0 {
 			middleware.AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Account access denied")
 			return false
 		}

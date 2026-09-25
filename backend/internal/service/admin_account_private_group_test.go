@@ -12,8 +12,14 @@ type privateCreateGroupRepo struct {
 	groups []Group
 }
 
-func (r *privateCreateGroupRepo) ListActiveByPlatform(_ context.Context, _ string) ([]Group, error) {
-	return r.groups, nil
+func (r *privateCreateGroupRepo) ListActiveByPlatform(_ context.Context, platform string) ([]Group, error) {
+	var groups []Group
+	for _, group := range r.groups {
+		if group.Platform == platform {
+			groups = append(groups, group)
+		}
+	}
+	return groups, nil
 }
 
 func (r *privateCreateGroupRepo) GetByIDLite(_ context.Context, id int64) (*Group, error) {
@@ -42,8 +48,15 @@ func (r *privateCreateAccountRepo) BindGroups(_ context.Context, _ int64, ids []
 	return nil
 }
 
+func TestRegularUserBulkGroupChangeDenied(t *testing.T) {
+	svc := &adminServiceImpl{}
+	groups := []int64{77}
+	_, err := svc.BulkUpdateAccounts(WithAccountCreatorUserID(context.Background(), 12), &BulkUpdateAccountsInput{GroupIDs: &groups})
+	require.Error(t, err)
+}
+
 func TestRegularUserOpenAICreateForcesOwnPrivateGroup(t *testing.T) {
-	groups := &privateCreateGroupRepo{groups: []Group{{ID: 11, Name: "private-usr12"}, {ID: 22, Name: "private-usr123"}}}
+	groups := &privateCreateGroupRepo{groups: []Group{{ID: 11, Name: "private-usr12", Platform: PlatformOpenAI}, {ID: 22, Name: "private-usr123", Platform: PlatformOpenAI}, {ID: 33, Name: "private-usr12-anthropic", Platform: PlatformAnthropic}, {ID: 44, Name: "private-usr123-anthropic", Platform: PlatformAnthropic}}}
 	for _, tc := range []struct {
 		userID int64
 		want   []int64
@@ -82,12 +95,21 @@ func TestRegularUserOpenAICreateForcesOwnPrivateGroup(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int64{999}, adminRepo.bound)
 
-	// Other platforms may still use public groups, but cannot attach to another
-	// user's private group and expose their credentials on that user's list.
+	// Other platforms also bind exclusively to their own private group.
+	anthropicRepo := &privateCreateAccountRepo{}
+	anthropicSvc := &adminServiceImpl{groupRepo: groups, accountRepo: anthropicRepo}
+	_, err = anthropicSvc.CreateAccount(WithAccountCreatorUserID(context.Background(), 12), &CreateAccountInput{
+		Name: "anthropic", Platform: PlatformAnthropic, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "test"}, GroupIDs: []int64{44}, SkipMixedChannelCheck: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []int64{33}, anthropicRepo.bound)
+
+	// A missing private group must fail closed, even with a public or foreign group.
 	foreignRepo := &privateCreateAccountRepo{}
 	foreignSvc := &adminServiceImpl{groupRepo: groups, accountRepo: foreignRepo}
 	_, err = foreignSvc.CreateAccount(WithAccountCreatorUserID(context.Background(), 12), &CreateAccountInput{
-		Name: "foreign", Platform: PlatformAnthropic, Type: AccountTypeAPIKey,
+		Name: "foreign", Platform: PlatformGemini, Type: AccountTypeAPIKey,
 		Credentials: map[string]any{"api_key": "test"}, GroupIDs: []int64{22},
 	})
 	require.Error(t, err)

@@ -153,8 +153,8 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	if user.Role == RoleUser && s.entClient != nil {
 		// Admin-created users bypass AuthService's registration bootstrap.
 		// Keep provisioning idempotent and fail open, as with email/OAuth signup.
-		if err := ensurePrivateOpenAISubscription(ctx, s.entClient, user.ID); err != nil {
-			logger.LegacyPrintf("service.admin", "Failed to provision private OpenAI subscription: user_id=%d err=%v", user.ID, err)
+		if err := ensurePrivatePlatformSubscriptions(ctx, s.entClient, user.ID, PrivateAccountPlatforms); err != nil {
+			logger.LegacyPrintf("service.admin", "Failed to provision private platform subscriptions: user_id=%d err=%v", user.ID, err)
 		}
 	}
 	// 创建管理员属权限敏感操作，落审计日志（含操作者），便于事后追溯。

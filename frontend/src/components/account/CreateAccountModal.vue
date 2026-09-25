@@ -3524,7 +3524,7 @@
 
         <!-- Group Selection - 仅标准模式显示 -->
         <GroupSelector
-          v-if="form.platform !== 'openai' || authStore.isAdmin"
+          v-if="authStore.isAdmin"
           v-model="form.group_ids"
           :groups="groups"
           :platform="form.platform"

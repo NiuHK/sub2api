@@ -51,7 +51,8 @@ type stubAdminService struct {
 		platform  string
 		groupIDs  []int64
 	}
-	lastListAccounts struct {
+	lastPrivateGroupIDs []int64
+	lastListAccounts    struct {
 		platform    string
 		accountType string
 		status      string
@@ -451,6 +452,25 @@ func (s *stubAdminService) ListAccounts(ctx context.Context, page, pageSize int,
 		end = total
 	}
 	return accounts[start:end], int64(total), nil
+}
+
+func (s *stubAdminService) ListPrivateAccounts(_ context.Context, page, pageSize int, platform, accountType, status, search string, groupIDs []int64, privacyMode, sortBy, sortOrder string) ([]service.Account, int64, error) {
+	s.lastPrivateGroupIDs = append([]int64(nil), groupIDs...)
+	var accounts []service.Account
+	for _, account := range s.accounts {
+		if platform != "" && platform != account.Platform {
+			continue
+		}
+		for _, id := range account.GroupIDs {
+			for _, privateID := range groupIDs {
+				if id == privateID {
+					accounts = append(accounts, account)
+					break
+				}
+			}
+		}
+	}
+	return accounts, int64(len(accounts)), nil
 }
 
 func (s *stubAdminService) ListAccountsForSchedulerScoreFilter(_ context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, error) {

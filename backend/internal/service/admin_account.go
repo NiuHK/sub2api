@@ -35,6 +35,24 @@ func (s *adminServiceImpl) ListAccounts(ctx context.Context, page, pageSize int,
 	return accounts, result.Total, nil
 }
 
+func (s *adminServiceImpl) ListPrivateAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupIDs []int64, privacyMode, sortBy, sortOrder string) ([]Account, int64, error) {
+	if len(groupIDs) == 0 {
+		return []Account{}, 0, nil
+	}
+	repo, ok := s.accountRepo.(interface {
+		ListWithPrivateGroupIDs(context.Context, pagination.PaginationParams, string, string, string, string, []int64, string) ([]Account, *pagination.PaginationResult, error)
+	})
+	if !ok {
+		return nil, 0, fmt.Errorf("private account list repository unavailable")
+	}
+	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
+	accounts, result, err := repo.ListWithPrivateGroupIDs(ctx, params, platform, accountType, status, search, groupIDs, privacyMode)
+	if err != nil {
+		return nil, 0, err
+	}
+	return accounts, result.Total, nil
+}
+
 func (s *adminServiceImpl) ListAccountsForSchedulerScoreFilter(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, error) {
 	if s == nil || s.accountRepo == nil {
 		return nil, nil
@@ -482,12 +500,19 @@ func WithAccountCreatorUserID(ctx context.Context, userID int64) context.Context
 	return context.WithValue(ctx, accountCreatorUserIDKey{}, userID)
 }
 
-func (s *adminServiceImpl) privateOpenAIGroupID(ctx context.Context, userID int64) (int64, error) {
+func privatePlatformGroupName(userID int64, platform string) string {
+	if platform == PlatformOpenAI {
+		return fmt.Sprintf("private-usr%d", userID)
+	}
+	return fmt.Sprintf("private-usr%d-%s", userID, platform)
+}
+
+func (s *adminServiceImpl) privatePlatformGroupID(ctx context.Context, userID int64, platform string) (int64, error) {
 	if userID <= 0 {
 		return 0, fmt.Errorf("invalid account creator")
 	}
-	name := fmt.Sprintf("private-usr%d", userID)
-	groups, err := s.groupRepo.ListActiveByPlatform(ctx, PlatformOpenAI)
+	name := privatePlatformGroupName(userID, platform)
+	groups, err := s.groupRepo.ListActiveByPlatform(ctx, platform)
 	if err != nil {
 		return 0, err
 	}
@@ -496,7 +521,11 @@ func (s *adminServiceImpl) privateOpenAIGroupID(ctx context.Context, userID int6
 			return group.ID, nil
 		}
 	}
-	return 0, fmt.Errorf("private OpenAI group %s not found", name)
+	return 0, fmt.Errorf("private %s group %s not found", platform, name)
+}
+
+func (s *adminServiceImpl) privateOpenAIGroupID(ctx context.Context, userID int64) (int64, error) {
+	return s.privatePlatformGroupID(ctx, userID, PlatformOpenAI)
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
@@ -516,26 +545,17 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		return nil, err
 	}
 
-	// 普通用户新增 OpenAI 账号只能绑定自己的私有分组；忽略请求中的分组。
+	// 普通用户新增账号只能绑定对应平台的私有分组；忽略请求中的分组。
 	groupIDs := input.GroupIDs
 	if userID, ok := ctx.Value(accountCreatorUserIDKey{}).(int64); ok {
-		if input.Platform == PlatformOpenAI {
-			groupID, err := s.privateOpenAIGroupID(ctx, userID)
-			if err != nil {
-				return nil, err
-			}
-			groupIDs = []int64{groupID}
-		} else {
-			for _, id := range groupIDs {
-				group, err := s.groupRepo.GetByIDLite(ctx, id)
-				if err != nil {
-					return nil, err
-				}
-				if strings.HasPrefix(group.Name, "private-usr") && group.Name != fmt.Sprintf("private-usr%d", userID) {
-					return nil, infraerrors.Forbidden("FORBIDDEN", "Cannot bind another user's private group")
-				}
-			}
+		if !containsPlatform(PrivateAccountPlatforms, input.Platform) {
+			return nil, infraerrors.Forbidden("FORBIDDEN", "Platform not available for private accounts")
 		}
+		groupID, err := s.privatePlatformGroupID(ctx, userID, input.Platform)
+		if err != nil {
+			return nil, err
+		}
+		groupIDs = []int64{groupID}
 	}
 	// 如果没有指定分组,自动绑定对应平台的默认分组
 	if len(groupIDs) == 0 && !input.SkipDefaultGroupBind {
@@ -619,8 +639,8 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if err != nil {
 		return nil, err
 	}
-	if userID, ok := ctx.Value(accountCreatorUserIDKey{}).(int64); ok && input.GroupIDs != nil {
-		groupID, err := s.privateOpenAIGroupID(ctx, userID)
+	if userID, ok := ctx.Value(accountCreatorUserIDKey{}).(int64); ok && input.GroupIDs != nil && containsPlatform(PrivateAccountPlatforms, account.Platform) {
+		groupID, err := s.privatePlatformGroupID(ctx, userID, account.Platform)
 		if err != nil {
 			return nil, err
 		}
@@ -999,13 +1019,8 @@ func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, upd
 // BulkUpdateAccounts updates multiple accounts in one request.
 // It merges credentials/extra keys instead of overwriting the whole object.
 func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error) {
-	if userID, ok := ctx.Value(accountCreatorUserIDKey{}).(int64); ok && input.GroupIDs != nil {
-		groupID, err := s.privateOpenAIGroupID(ctx, userID)
-		if err != nil {
-			return nil, err
-		}
-		groupIDs := []int64{groupID}
-		input.GroupIDs = &groupIDs
+	if _, regularUser := ctx.Value(accountCreatorUserIDKey{}).(int64); regularUser && input.GroupIDs != nil {
+		return nil, infraerrors.Forbidden("FORBIDDEN", "Bulk group changes are not available to regular users")
 	}
 	// Managed probe/session state may only enter through dedicated typed endpoints.
 	input.Extra = sanitizedCodexFingerprintExtraUpdates(input.Extra)

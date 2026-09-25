@@ -95,11 +95,12 @@ func TestAccountHandlerListScopesRegularUserToExactPrivateGroup(t *testing.T) {
 		wantCalls int
 	}{
 		{service.RoleAdmin, 12, 999, 1},
-		{service.RoleUser, 12, 11, 1},
-		{service.RoleUser, 123, 22, 1},
+		{service.RoleUser, 12, 11, 0},
+		{service.RoleUser, 123, 22, 0},
 		{service.RoleUser, 7, 0, 0},
 	} {
 		adminSvc.lastListAccounts.calls = 0
+		adminSvc.lastPrivateGroupIDs = nil
 		router := gin.New()
 		router.Use(func(c *gin.Context) {
 			c.Set(string(middleware.ContextKeyUserRole), tc.role)
@@ -114,8 +115,48 @@ func TestAccountHandlerListScopesRegularUserToExactPrivateGroup(t *testing.T) {
 		if tc.wantCalls > 0 {
 			require.Equal(t, tc.wantGroup, adminSvc.lastListAccounts.groupID)
 		} else {
+			require.Empty(t, adminSvc.lastPrivateGroupIDs, "unowned group filter must not widen account access")
 			require.Contains(t, rec.Body.String(), `"total":0`)
 		}
+	}
+}
+
+func TestAccountHandlerListScopesAcrossPrivatePlatforms(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	adminSvc := newStubAdminService()
+	adminSvc.groups = []service.Group{
+		{ID: 11, Name: "private-usr12", Platform: service.PlatformOpenAI},
+		{ID: 33, Name: "private-usr12-anthropic", Platform: service.PlatformAnthropic},
+		{ID: 44, Name: "private-usr123-anthropic", Platform: service.PlatformAnthropic},
+	}
+	adminSvc.accounts = []service.Account{
+		{ID: 1, Platform: service.PlatformOpenAI, GroupIDs: []int64{11}},
+		{ID: 2, Platform: service.PlatformAnthropic, GroupIDs: []int64{33}},
+		{ID: 3, Platform: service.PlatformAnthropic, GroupIDs: []int64{44}},
+	}
+	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(middleware.ContextKeyUserRole), service.RoleUser)
+		c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 12})
+		c.Next()
+	})
+	router.GET("/api/v1/admin/accounts", handler.List)
+	for _, tc := range []struct {
+		path  string
+		ids   []int64
+		total string
+	}{
+		{"/api/v1/admin/accounts", []int64{11, 33}, `"total":2`},
+		{"/api/v1/admin/accounts?platform=anthropic", []int64{33}, `"total":1`},
+		{"/api/v1/admin/accounts?platform=anthropic&group=44", nil, `"total":0`},
+	} {
+		adminSvc.lastPrivateGroupIDs = nil
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Equal(t, tc.ids, adminSvc.lastPrivateGroupIDs)
+		require.Contains(t, rec.Body.String(), tc.total)
 	}
 }
 

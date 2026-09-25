@@ -1099,6 +1099,33 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 	return q
 }
 
+// ListWithPrivateGroupIDs applies the same database-side filters, sort and pagination
+// across a regular user's platform-specific groups. Never call with an empty set.
+func (r *accountRepository) ListWithPrivateGroupIDs(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupIDs []int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
+	if len(groupIDs) == 0 {
+		return nil, paginationResultFromTotal(0, params), nil
+	}
+	q := r.accountListFilteredQuery(platform, accountType, status, search, 0, privacyMode).
+		Where(dbaccount.HasAccountGroupsWith(dbaccountgroup.GroupIDIn(groupIDs...)))
+	total, err := q.Clone().Count(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	accountsQuery := q.Offset(params.Offset()).Limit(params.Limit())
+	for _, order := range accountListOrder(params) {
+		accountsQuery = accountsQuery.Order(order)
+	}
+	accounts, err := accountsQuery.All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err := r.accountsToService(ctx, accounts)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, paginationResultFromTotal(int64(total), params), nil
+}
+
 func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
 	q := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode)
 	// Clone before Count so interceptor-appended predicates (SoftDeleteMixin's

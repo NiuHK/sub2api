@@ -69,7 +69,7 @@ func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
 			return
 		}
 		var err error
-		groupID, err = h.privateGroupID(c, subject.UserID)
+		groupID, err = h.privateGroupID(c, subject.UserID, service.PlatformOpenAI)
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return

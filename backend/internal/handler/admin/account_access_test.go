@@ -19,10 +19,18 @@ type scopedAccountService struct {
 
 func (s *scopedAccountService) GetAccount(_ context.Context, id int64) (*service.Account, error) {
 	groupIDs := []int64{77}
-	if id == 2 {
+	platform := service.PlatformOpenAI
+	switch id {
+	case 2:
 		groupIDs = []int64{88}
+	case 3:
+		platform, groupIDs = service.PlatformAnthropic, []int64{33}
+	case 4:
+		platform, groupIDs = service.PlatformAnthropic, []int64{44}
+	case 5:
+		platform, groupIDs = service.PlatformAnthropic, []int64{77} // OpenAI group cannot grant Anthropic access
 	}
-	return &service.Account{ID: id, GroupIDs: groupIDs}, nil
+	return &service.Account{ID: id, Platform: platform, GroupIDs: groupIDs}, nil
 }
 
 func TestRegularUserUpstreamBillingRatesUsePrivateGroup(t *testing.T) {
@@ -46,7 +54,7 @@ func TestRegularUserUpstreamBillingRatesUsePrivateGroup(t *testing.T) {
 func TestRegularUserAccountAPIGuard(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	adminSvc := &scopedAccountService{newStubAdminService()}
-	adminSvc.groups = []service.Group{{ID: 77, Name: "private-usr12"}, {ID: 88, Name: "private-usr123"}}
+	adminSvc.groups = []service.Group{{ID: 77, Name: "private-usr12"}, {ID: 88, Name: "private-usr123"}, {ID: 33, Name: "private-usr12-anthropic"}, {ID: 44, Name: "private-usr123-anthropic"}}
 	h := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	for _, tc := range []struct {
 		method, path, body, role string
@@ -54,6 +62,9 @@ func TestRegularUserAccountAPIGuard(t *testing.T) {
 	}{
 		{http.MethodGet, "/api/v1/admin/accounts/1", "", service.RoleUser, http.StatusOK},
 		{http.MethodGet, "/api/v1/admin/accounts/2", "", service.RoleUser, http.StatusForbidden},
+		{http.MethodGet, "/api/v1/admin/accounts/3", "", service.RoleUser, http.StatusOK},
+		{http.MethodGet, "/api/v1/admin/accounts/4", "", service.RoleUser, http.StatusForbidden},
+		{http.MethodGet, "/api/v1/admin/accounts/5", "", service.RoleUser, http.StatusForbidden},
 		{http.MethodPut, "/api/v1/admin/accounts/2", "", service.RoleUser, http.StatusForbidden},
 		{http.MethodDelete, "/api/v1/admin/accounts/2", "", service.RoleUser, http.StatusForbidden},
 		{http.MethodPost, "/api/v1/admin/openai/accounts/2/quota/refresh", "", service.RoleUser, http.StatusForbidden},
