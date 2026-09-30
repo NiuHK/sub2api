@@ -10,6 +10,13 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 )
 
+const privateOpenAIGroupPrefix = "Private-openai-USR"
+
+// PrivateOpenAIGroupName returns the managed OpenAI group name for a user.
+func PrivateOpenAIGroupName(userID int64) string {
+	return fmt.Sprintf("%s%d", privateOpenAIGroupPrefix, userID)
+}
+
 // ensurePrivateOpenAISubscription provisions only the supplied user. Keep the
 // names/markers in sync with tools/provision_private_openai.sql. Existing rows
 // are never renewed or taken over. The transaction prevents half-provisioning.
@@ -17,7 +24,7 @@ func ensurePrivateOpenAISubscription(ctx context.Context, client *dbent.Client, 
 	if client == nil || userID <= 0 {
 		return fmt.Errorf("private subscription: invalid user or client")
 	}
-	name := fmt.Sprintf("private-usr%d", userID)
+	name := PrivateOpenAIGroupName(userID)
 	description := fmt.Sprintf("Managed private OpenAI group for user %d (private-subscription-v1)", userID)
 	note := fmt.Sprintf("Managed private OpenAI subscription for user %d (private-subscription-v1)", userID)
 	tx, err := client.Tx(ctx)

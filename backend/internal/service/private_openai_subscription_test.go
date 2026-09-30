@@ -21,7 +21,9 @@ import (
 
 func TestEnsurePrivateOpenAISubscription(t *testing.T) {
 	ctx := context.Background()
-	db, err := sql.Open("sqlite", "file:private_openai_test?mode=memory&cache=shared")
+	db, err := sql.Open("sqlite", "file:private_openai_test?mode=memory&cache=shared&_fk=1")
+	require.NoError(t, err)
+	_, err = db.Exec("PRAGMA foreign_keys = ON")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	drv := entsql.OpenDB(dialect.SQLite, db)
@@ -31,7 +33,7 @@ func TestEnsurePrivateOpenAISubscription(t *testing.T) {
 	second, err := client.User.Create().SetEmail("second-private@example.com").SetPasswordHash("test").Save(ctx)
 	require.NoError(t, err)
 	require.NoError(t, ensurePrivateOpenAISubscription(ctx, client, first.ID))
-	g, err := client.Group.Query().Where(group.NameEQ(fmt.Sprintf("private-usr%d", first.ID))).Only(ctx)
+	g, err := client.Group.Query().Where(group.NameEQ(fmt.Sprintf("Private-openai-USR%d", first.ID))).Only(ctx)
 	require.NoError(t, err)
 	require.Equal(t, PlatformOpenAI, g.Platform)
 	require.Equal(t, SubscriptionTypeSubscription, g.SubscriptionType)

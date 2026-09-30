@@ -14,7 +14,7 @@ import (
 )
 
 func (h *AccountHandler) privateGroupID(c *gin.Context, userID int64) (int64, error) {
-	name := "private-usr" + strconv.FormatInt(userID, 10)
+	name := service.PrivateOpenAIGroupName(userID)
 	groups, _, err := h.adminService.ListGroups(c.Request.Context(), 1, 10000, "", "", name, nil, "", "")
 	if err != nil {
 		return 0, err

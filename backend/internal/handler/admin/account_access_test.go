@@ -28,7 +28,7 @@ func (s *scopedAccountService) GetAccount(_ context.Context, id int64) (*service
 func TestRegularUserUpstreamBillingRatesUsePrivateGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	adminSvc := newStubAdminService()
-	adminSvc.groups = []service.Group{{ID: 77, Name: "private-usr12"}}
+	adminSvc.groups = []service.Group{{ID: 77, Name: "Private-openai-USR12"}}
 	h := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -46,7 +46,7 @@ func TestRegularUserUpstreamBillingRatesUsePrivateGroup(t *testing.T) {
 func TestRegularUserAccountAPIGuard(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	adminSvc := &scopedAccountService{newStubAdminService()}
-	adminSvc.groups = []service.Group{{ID: 77, Name: "private-usr12"}, {ID: 88, Name: "private-usr123"}}
+	adminSvc.groups = []service.Group{{ID: 77, Name: "Private-openai-USR12"}, {ID: 88, Name: "Private-openai-USR123"}}
 	h := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	for _, tc := range []struct {
 		method, path, body, role string

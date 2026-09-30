@@ -2,7 +2,7 @@
 
 This is an external, idempotent repair/backfill tool for **existing non-deleted, role=user** rows.
 Use `--user-id N` to limit it to one user; omit it for a full backfill.
-For each selected user ID N, it creates the exclusive OpenAI subscription group `private-usrN`
+For each selected user ID N, it creates the exclusive OpenAI subscription group `Private-openai-USR<N>`
 and an active `user_subscriptions` row for that user and group, valid for 1000 days.
 The group has no daily/weekly/monthly dollar cap (NULL); this does **not** add
 upstream accounts. No new authorization mechanism is introduced: API Keys still
@@ -37,7 +37,7 @@ identity/marker/1000-day semantics. Admin-created admins are excluded.
 Provisioning failures are logged without invalidating successful creation;
 use this tool with `--user-id` to repair the user after addressing the error.
 Do not expose the tool as a user-controlled endpoint. To verify the result,
-check that an eligible user's `private-usrN` group appears under
+check that an eligible user's `Private-openai-USR<N>` group appears under
 `/groups/available`, and that another user
 without a subscription cannot bind an API Key to that group. No live request can
 use the group until an upstream account is assigned separately.

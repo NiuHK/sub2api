@@ -486,7 +486,7 @@ func (s *adminServiceImpl) privateOpenAIGroupID(ctx context.Context, userID int6
 	if userID <= 0 {
 		return 0, fmt.Errorf("invalid account creator")
 	}
-	name := fmt.Sprintf("private-usr%d", userID)
+	name := PrivateOpenAIGroupName(userID)
 	groups, err := s.groupRepo.ListActiveByPlatform(ctx, PlatformOpenAI)
 	if err != nil {
 		return 0, err
@@ -531,7 +531,7 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 				if err != nil {
 					return nil, err
 				}
-				if strings.HasPrefix(group.Name, "private-usr") && group.Name != fmt.Sprintf("private-usr%d", userID) {
+				if strings.HasPrefix(group.Name, "Private-openai-USR") && group.Name != PrivateOpenAIGroupName(userID) {
 					return nil, infraerrors.Forbidden("FORBIDDEN", "Cannot bind another user's private group")
 				}
 			}

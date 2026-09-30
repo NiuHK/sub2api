@@ -84,8 +84,8 @@ func TestAccountHandlerListScopesRegularUserToExactPrivateGroup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	adminSvc := newStubAdminService()
 	adminSvc.groups = []service.Group{
-		{ID: 11, Name: "private-usr12"},
-		{ID: 22, Name: "private-usr123"},
+		{ID: 11, Name: "Private-openai-USR12"},
+		{ID: 22, Name: "Private-openai-USR123"},
 	}
 	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	for _, tc := range []struct {

@@ -43,7 +43,7 @@ func (r *privateCreateAccountRepo) BindGroups(_ context.Context, _ int64, ids []
 }
 
 func TestRegularUserOpenAICreateForcesOwnPrivateGroup(t *testing.T) {
-	groups := &privateCreateGroupRepo{groups: []Group{{ID: 11, Name: "private-usr12"}, {ID: 22, Name: "private-usr123"}}}
+	groups := &privateCreateGroupRepo{groups: []Group{{ID: 11, Name: "Private-openai-USR12"}, {ID: 22, Name: "Private-openai-USR123"}}}
 	for _, tc := range []struct {
 		userID int64
 		want   []int64
