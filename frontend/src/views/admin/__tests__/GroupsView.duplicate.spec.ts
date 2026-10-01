@@ -245,6 +245,27 @@ describe('GroupsView duplicate action', () => {
     wrapper.unmount()
   })
 
+  it('shows exclusive quota controls only for one-account OAuth-only groups', async () => {
+    const oauthOnlyGroup = { ...sourceGroup, require_oauth_only: true }
+    listGroups.mockResolvedValueOnce({ items: [oauthOnlyGroup], total: 1, page: 1, page_size: 20, pages: 1 })
+    const eligible = mountView()
+    await flushPromises()
+    expect(eligible.find('[data-testid="group-rate-multipliers"]').exists()).toBe(true)
+    eligible.unmount()
+
+    listGroups.mockResolvedValueOnce({
+      items: [{ ...oauthOnlyGroup, account_count: 2 }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1
+    })
+    const multipleAccounts = mountView()
+    await flushPromises()
+    expect(multipleAccounts.find('[data-testid="group-rate-multipliers"]').exists()).toBe(false)
+    multipleAccounts.unmount()
+  })
+
   it('ignores repeated clicks while the duplicate request is in flight', async () => {
     let resolveDuplicate!: (value: AdminGroup) => void
     duplicateGroup.mockImplementationOnce(

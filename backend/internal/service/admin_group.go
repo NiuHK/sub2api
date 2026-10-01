@@ -1288,8 +1288,14 @@ func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, gro
 		return nil
 	}
 	for _, e := range entries {
-		if e.RateMultiplier <= 0 {
+		if e.RateMultiplier != nil && *e.RateMultiplier <= 0 {
 			return fmt.Errorf("rate_multiplier must be > 0 (user_id=%d)", e.UserID)
+		}
+		if e.RateMultiplier == nil && e.QuotaPercentage == nil && !e.QuotaPercentage5hEnabled && !e.QuotaPercentage7dEnabled {
+			return fmt.Errorf("rate_multiplier or quota configuration is required (user_id=%d)", e.UserID)
+		}
+		if e.QuotaPercentage != nil && (*e.QuotaPercentage < 0 || *e.QuotaPercentage > 100) {
+			return fmt.Errorf("quota_percentage must be between 0 and 100 (user_id=%d)", e.UserID)
 		}
 	}
 	return s.userGroupRateRepo.SyncGroupRateMultipliers(ctx, groupID, entries)

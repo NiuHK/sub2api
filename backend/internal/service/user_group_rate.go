@@ -5,19 +5,41 @@ import "context"
 // UserGroupRateEntry 分组下用户专属倍率/RPM 条目。
 // RateMultiplier 与 RPMOverride 均为指针以支持"未设置"语义（NULL）。
 type UserGroupRateEntry struct {
-	UserID         int64    `json:"user_id"`
-	UserName       string   `json:"user_name"`
-	UserEmail      string   `json:"user_email"`
-	UserNotes      string   `json:"user_notes"`
-	UserStatus     string   `json:"user_status"`
-	RateMultiplier *float64 `json:"rate_multiplier,omitempty"`
-	RPMOverride    *int     `json:"rpm_override,omitempty"`
+	UserID                   int64    `json:"user_id"`
+	UserName                 string   `json:"user_name"`
+	UserEmail                string   `json:"user_email"`
+	UserNotes                string   `json:"user_notes"`
+	UserStatus               string   `json:"user_status"`
+	RateMultiplier           *float64 `json:"rate_multiplier,omitempty"`
+	RPMOverride              *int     `json:"rpm_override,omitempty"`
+	QuotaPercentage          *float64 `json:"quota_percentage,omitempty"`
+	QuotaPercentage5hEnabled bool     `json:"quota_percentage_5h_enabled"`
+	QuotaPercentage7dEnabled bool     `json:"quota_percentage_7d_enabled"`
 }
 
 // GroupRateMultiplierInput 批量设置分组倍率的输入条目
 type GroupRateMultiplierInput struct {
-	UserID         int64   `json:"user_id"`
-	RateMultiplier float64 `json:"rate_multiplier"`
+	UserID                   int64    `json:"user_id"`
+	// RateMultiplier is nil when this entry only configures an OpenAI quota
+	// percentage. Keeping the NULL value is important because it means the
+	// user still inherits the group's default billing multiplier.
+	RateMultiplier           *float64 `json:"rate_multiplier"`
+	QuotaPercentage          *float64 `json:"quota_percentage,omitempty"`
+	QuotaPercentage5hEnabled bool     `json:"quota_percentage_5h_enabled"`
+	QuotaPercentage7dEnabled bool     `json:"quota_percentage_7d_enabled"`
+}
+
+// OpenAIQuotaAllocationConfig is the per-user, per-group OpenAI quota policy.
+type OpenAIQuotaAllocationConfig struct {
+	Percentage *float64
+	Enable5h   bool
+	Enable7d   bool
+}
+
+// OpenAIQuotaAllocationRepository is the optional extension used by the
+// OpenAI OAuth percentage allocation gate.
+type OpenAIQuotaAllocationRepository interface {
+	GetQuotaAllocationByUserAndGroup(ctx context.Context, userID, groupID int64) (*OpenAIQuotaAllocationConfig, error)
 }
 
 // GroupRPMOverrideInput 批量设置分组 RPM override 的输入条目。

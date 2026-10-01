@@ -48,6 +48,7 @@ type OpenAIGatewayHandler struct {
 	imageLimiter               *imageConcurrencyLimiter
 	maxAccountSwitches         int
 	cfg                        *config.Config
+	quotaAllocationService     *service.OpenAIQuotaAllocationService
 }
 
 type openAIWSTurnChannelMappingSnapshot struct {
@@ -378,6 +379,25 @@ func NewOpenAIGatewayHandler(
 // SetSubscriptionService wires subscription lookup without changing existing constructor call sites.
 func (h *OpenAIGatewayHandler) SetSubscriptionService(subscriptionService *service.SubscriptionService) {
 	h.subscriptionService = subscriptionService
+}
+
+func (h *OpenAIGatewayHandler) SetQuotaAllocationService(quotaService *service.OpenAIQuotaAllocationService) {
+	h.quotaAllocationService = quotaService
+}
+
+func (h *OpenAIGatewayHandler) checkOpenAIQuotaAllocation(c *gin.Context, userID int64, groupID *int64, account *service.Account, anthropic bool) bool {
+	if h == nil || h.quotaAllocationService == nil || groupID == nil {
+		return true
+	}
+	if err := h.quotaAllocationService.Check(c.Request.Context(), userID, *groupID, account); err != nil && service.IsOpenAIQuotaAllocationExceeded(err) {
+		if anthropic {
+			h.anthropicStreamingAwareError(c, service.OpenAIQuotaAllocationHTTPStatus, "rate_limit_error", err.Error(), false)
+		} else {
+			h.errorResponse(c, service.OpenAIQuotaAllocationHTTPStatus, "rate_limit_error", err.Error())
+		}
+		return false
+	}
+	return true
 }
 
 // resolveGroupSubscription resolves explicit group scope independently of middleware's primary group.
@@ -758,6 +778,12 @@ func (h *OpenAIGatewayHandler) responsesSingle(c *gin.Context) {
 			zap.Float64("load_skew", scheduleDecision.LoadSkew),
 		)
 		account := selection.Account
+		if !h.checkOpenAIQuotaAllocation(c, subject.UserID, apiKey.GroupID, account, false) {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			return
+		}
 		if previousResponseID != "" && requestPlatform == service.PlatformOpenAI && !account.IsOpenAIApiKey() {
 			// The public Responses HTTP API supports previous_response_id on API-key
 			// accounts. OAuth/SetupToken upstreams do not, so keep searching instead
@@ -1373,6 +1399,12 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			return
 		}
 		account := selection.Account
+		if !h.checkOpenAIQuotaAllocation(c, subject.UserID, apiKey.GroupID, account, true) {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			return
+		}
 		sessionHash = ensureOpenAIPoolModeSessionHash(sessionHash, account)
 		reqLog.Debug("openai_messages.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
 		_ = scheduleDecision
@@ -2866,6 +2898,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				c.Set(securityAuditWSTurnContextKey, turn)
 				service.BeginOpsStreamTurn(c, turn)
 				setCyberTurnBody(turn, payload)
+				if h.quotaAllocationService != nil && apiKey.GroupID != nil {
+					if err := h.quotaAllocationService.Check(ctx, subject.UserID, *apiKey.GroupID, account); err != nil && service.IsOpenAIQuotaAllocationExceeded(err) {
+						return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, err.Error(), err)
+					}
+				}
 				// 连接级 cyber session gate 也在 BeforeRequest 先执行，使 native 与
 				// passthrough ingress 都能在 BeforeTurn 及上游写入前无副作用地拒绝。
 				// BeforeTurn 中保留同一检查作为防御式兜底。

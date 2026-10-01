@@ -338,6 +338,9 @@ export interface GroupRateMultiplierEntry {
   user_status: string
   rate_multiplier?: number | null
   rpm_override?: number | null
+  quota_percentage?: number | null
+  quota_percentage_5h_enabled?: boolean
+  quota_percentage_7d_enabled?: boolean
 }
 
 /**
@@ -377,12 +380,18 @@ export async function clearGroupRateMultipliers(id: number): Promise<{ message: 
 }
 
 /**
- * Batch set rate multipliers for users in a group
- * Only touches rate_multiplier column; preserves rpm_override on existing rows.
+ * Batch set rate multipliers and quota allocations for users in a group.
+ * A null rate_multiplier preserves the group default; rpm_override remains untouched.
  */
 export async function batchSetGroupRateMultipliers(
   id: number,
-  entries: Array<{ user_id: number; rate_multiplier: number }>
+  entries: Array<{
+    user_id: number
+    rate_multiplier: number | null
+    quota_percentage?: number | null
+    quota_percentage_5h_enabled?: boolean
+    quota_percentage_7d_enabled?: boolean
+  }>
 ): Promise<{ message: string }> {
   const { data } = await apiClient.put<{ message: string }>(
     `/admin/groups/${id}/rate-multipliers`,

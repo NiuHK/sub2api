@@ -232,6 +232,15 @@ func (h *OpenAIGatewayHandler) chatCompletionsSingle(c *gin.Context) {
 			return
 		}
 		account := selection.Account
+		if !h.checkOpenAIQuotaAllocation(c, subject.UserID, apiKey.GroupID, account, false) {
+			// Account selection may have acquired a scheduler slot. Release it
+			// before returning the quota rejection so a blocked request cannot
+			// strand capacity.
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			return
+		}
 		sessionHash = ensureOpenAIPoolModeSessionHash(sessionHash, account)
 		reqLog.Debug("openai_chat_completions.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
 		_ = scheduleDecision

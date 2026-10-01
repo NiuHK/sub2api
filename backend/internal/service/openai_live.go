@@ -176,6 +176,14 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 		}
 
 		account := selection.Account
+		if s.quotaAllocationService != nil && identity.GroupID != nil {
+			if quotaErr := s.quotaAllocationService.Check(ctx, identity.UserID, *identity.GroupID, account); quotaErr != nil && IsOpenAIQuotaAllocationExceeded(quotaErr) {
+				if selection.ReleaseFunc != nil {
+					selection.ReleaseFunc()
+				}
+				return nil, quotaErr
+			}
+		}
 		leaseID := generateRequestID()
 		acquired, acquireErr := liveCache.AcquireLiveLease(
 			ctx,

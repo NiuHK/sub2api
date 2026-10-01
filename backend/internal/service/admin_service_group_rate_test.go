@@ -167,8 +167,8 @@ func TestAdminService_BatchSetGroupRateMultipliers(t *testing.T) {
 		svc := &adminServiceImpl{userGroupRateRepo: repo}
 
 		entries := []GroupRateMultiplierInput{
-			{UserID: 1, RateMultiplier: 1.5},
-			{UserID: 2, RateMultiplier: 0.8},
+			{UserID: 1, RateMultiplier: ptrFloat(1.5)},
+			{UserID: 2, RateMultiplier: ptrFloat(0.8)},
 		}
 		err := svc.BatchSetGroupRateMultipliers(context.Background(), 10, entries)
 		require.NoError(t, err)
@@ -190,10 +190,31 @@ func TestAdminService_BatchSetGroupRateMultipliers(t *testing.T) {
 		svc := &adminServiceImpl{userGroupRateRepo: repo}
 
 		err := svc.BatchSetGroupRateMultipliers(context.Background(), 10, []GroupRateMultiplierInput{
-			{UserID: 1, RateMultiplier: 1.0},
+			{UserID: 1, RateMultiplier: ptrFloat(1.0)},
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "sync failed")
+	})
+
+	t.Run("accepts quota-only entry with a NULL rate multiplier", func(t *testing.T) {
+		repo := &userGroupRateRepoStubForGroupRate{}
+		svc := &adminServiceImpl{userGroupRateRepo: repo}
+		quota := 30.0
+		entries := []GroupRateMultiplierInput{{UserID: 7, QuotaPercentage: &quota}}
+
+		err := svc.BatchSetGroupRateMultipliers(context.Background(), 10, entries)
+		require.NoError(t, err)
+		require.Equal(t, entries, repo.syncedEntries)
+	})
+
+	t.Run("rejects an entry with no rate or quota configuration", func(t *testing.T) {
+		repo := &userGroupRateRepoStubForGroupRate{}
+		svc := &adminServiceImpl{userGroupRateRepo: repo}
+
+		err := svc.BatchSetGroupRateMultipliers(context.Background(), 10, []GroupRateMultiplierInput{{UserID: 7}})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "rate_multiplier or quota configuration is required")
+		require.Zero(t, repo.syncedGroupID)
 	})
 }
 

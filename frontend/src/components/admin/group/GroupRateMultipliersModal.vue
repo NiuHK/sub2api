@@ -60,10 +60,30 @@
               placeholder="1.0"
             />
           </div>
+          <div class="w-24">
+            <input
+              v-model.number="newQuota"
+              type="number"
+              step="1"
+              min="0"
+              max="100"
+              autocomplete="off"
+              class="hide-spinner input w-full"
+              :placeholder="t('admin.groups.quotaPercentage')"
+            />
+          </div>
+          <div class="flex w-24 flex-col items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <span>{{ t('admin.groups.quotaPercentage5h') }}</span>
+            <Toggle v-model="newQuota5hEnabled" />
+          </div>
+          <div class="flex w-24 flex-col items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <span>{{ t('admin.groups.quotaPercentage7d') }}</span>
+            <Toggle v-model="newQuota7dEnabled" />
+          </div>
           <button
             type="button"
             class="btn btn-primary shrink-0"
-            :disabled="!selectedUser || newRate == null || newRate <= 0"
+            :disabled="!selectedUser || !((newRate != null && newRate > 0) || newQuota != null)"
             @click="handleAddLocal"
           >
             {{ t('common.add') }}
@@ -136,6 +156,9 @@
                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.groups.columns.userNotes') }}</th>
                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.groups.columns.userStatus') }}</th>
                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.groups.columns.rateMultiplier') }}</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.groups.quotaPercentage') }}</th>
+                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.groups.quotaPercentage5h') }}</th>
+                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.groups.quotaPercentage7d') }}</th>
                     <th v-if="showFinalRate" class="px-3 py-2 text-left text-xs font-medium text-primary-600 dark:text-primary-400">{{ t('admin.groups.finalRate') }}</th>
                     <th class="w-10 px-2 py-2"></th>
                   </tr>
@@ -172,6 +195,31 @@
                         :placeholder="String(props.group?.rate_multiplier ?? 1)"
                         class="hide-spinner w-20 rounded border border-gray-200 bg-white px-2 py-1 text-center text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
                         @change="updateLocalRate(entry.user_id, ($event.target as HTMLInputElement).value)"
+                      />
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2">
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        max="100"
+                        autocomplete="off"
+                        :value="entry.quota_percentage ?? ''"
+                        placeholder="不限"
+                        class="hide-spinner w-20 rounded border border-gray-200 bg-white px-2 py-1 text-center text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
+                        @change="updateLocalQuota(entry.user_id, ($event.target as HTMLInputElement).value)"
+                      />
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-center">
+                      <Toggle
+                        :model-value="entry.quota_percentage_5h_enabled ?? false"
+                        @update:model-value="updateLocalQuotaWindow(entry.user_id, '5h', $event)"
+                      />
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-center">
+                      <Toggle
+                        :model-value="entry.quota_percentage_7d_enabled ?? false"
+                        @update:model-value="updateLocalQuotaWindow(entry.user_id, '7d', $event)"
                       />
                     </td>
                     <td v-if="showFinalRate" class="whitespace-nowrap px-3 py-2 font-medium text-primary-600 dark:text-primary-400">
@@ -249,6 +297,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import Toggle from '@/components/common/Toggle.vue'
 
 interface LocalEntry extends GroupRateMultiplierEntry {}
 
@@ -274,6 +323,9 @@ const searchResults = ref<AdminUser[]>([])
 const showDropdown = ref(false)
 const selectedUser = ref<AdminUser | null>(null)
 const newRate = ref<number | null>(null)
+const newQuota = ref<number | null>(null)
+const newQuota5hEnabled = ref(false)
+const newQuota7dEnabled = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const batchFactor = ref<number | null>(null)
@@ -304,8 +356,8 @@ const computeFinalRate = (rate: number | null | undefined) => {
 // 检测是否有未保存的修改
 const isDirty = computed(() => {
   if (localEntries.value.length !== serverEntries.value.length) return true
-  const serverMap = new Map(serverEntries.value.map(e => [e.user_id, e.rate_multiplier ?? null]))
-  return localEntries.value.some(e => serverMap.get(e.user_id) !== (e.rate_multiplier ?? null))
+  const serverMap = new Map(serverEntries.value.map(e => [e.user_id, `${e.rate_multiplier ?? ''}:${e.quota_percentage ?? ''}:${e.quota_percentage_5h_enabled ?? false}:${e.quota_percentage_7d_enabled ?? false}`]))
+  return localEntries.value.some(e => serverMap.get(e.user_id) !== `${e.rate_multiplier ?? ''}:${e.quota_percentage ?? ''}:${e.quota_percentage_5h_enabled ?? false}:${e.quota_percentage_7d_enabled ?? false}`)
 })
 
 const paginatedLocalEntries = computed(() => {
@@ -314,7 +366,7 @@ const paginatedLocalEntries = computed(() => {
 })
 
 const cloneEntries = (entries: GroupRateMultiplierEntry[]): LocalEntry[] => {
-  return entries.map(e => ({ ...e }))
+  return entries.map(e => ({ ...e, quota_percentage_5h_enabled: e.quota_percentage_5h_enabled ?? false, quota_percentage_7d_enabled: e.quota_percentage_7d_enabled ?? false }))
 }
 
 const loadEntries = async () => {
@@ -322,8 +374,8 @@ const loadEntries = async () => {
   loading.value = true
   try {
     const raw = await adminAPI.groups.getGroupRateMultipliers(props.group.id)
-    // 仅显示已设置 rate_multiplier 的条目；rpm_override 在另一个弹窗管理，保留不动
-    serverEntries.value = raw.filter(e => e.rate_multiplier != null)
+    // 显示已设置倍率或配额的条目；rpm_override 在另一个弹窗管理，保留不动
+    serverEntries.value = raw.filter(e => e.rate_multiplier != null || e.quota_percentage != null || e.quota_percentage_5h_enabled || e.quota_percentage_7d_enabled)
     localEntries.value = cloneEntries(serverEntries.value)
     adjustPage()
   } catch (error) {
@@ -349,6 +401,9 @@ watch(() => props.show, (val) => {
     searchResults.value = []
     selectedUser.value = null
     newRate.value = null
+    newQuota.value = null
+    newQuota5hEnabled.value = false
+    newQuota7dEnabled.value = false
     loadEntries()
   }
 })
@@ -386,7 +441,7 @@ const selectUser = (user: AdminUser) => {
 
 // 本地添加（或覆盖已有用户）
 const handleAddLocal = () => {
-  if (!selectedUser.value || newRate.value == null || newRate.value <= 0) return
+  if (!selectedUser.value || !((newRate.value != null && newRate.value > 0) || newQuota.value != null)) return
   const user = selectedUser.value
   const idx = localEntries.value.findIndex(e => e.user_id === user.id)
   const entry: LocalEntry = {
@@ -396,6 +451,9 @@ const handleAddLocal = () => {
     user_notes: user.notes || '',
     user_status: user.status || 'active',
     rate_multiplier: newRate.value,
+    quota_percentage: newQuota.value,
+    quota_percentage_5h_enabled: newQuota5hEnabled.value,
+    quota_percentage_7d_enabled: newQuota7dEnabled.value,
     rpm_override: null
   }
   if (idx >= 0) {
@@ -406,7 +464,29 @@ const handleAddLocal = () => {
   searchQuery.value = ''
   selectedUser.value = null
   newRate.value = null
+  newQuota.value = null
+  newQuota5hEnabled.value = false
+  newQuota7dEnabled.value = false
   adjustPage()
+}
+
+const updateLocalQuotaWindow = (userId: number, window: '5h' | '7d', enabled: boolean) => {
+  const entry = localEntries.value.find(e => e.user_id === userId)
+  if (!entry) return
+  if (window === '5h') entry.quota_percentage_5h_enabled = enabled
+  else entry.quota_percentage_7d_enabled = enabled
+}
+
+const updateLocalQuota = (userId: number, value: string) => {
+  const entry = localEntries.value.find(e => e.user_id === userId)
+  if (!entry) return
+  if (value.trim() === '') {
+    entry.quota_percentage = null
+    return
+  }
+  const num = parseFloat(value)
+  if (isNaN(num)) return
+  entry.quota_percentage = Math.min(100, Math.max(0, num))
 }
 
 // 本地修改倍率
@@ -457,11 +537,17 @@ const handleSave = async () => {
   saving.value = true
   try {
     const entries = localEntries.value
-      .filter(e => e.rate_multiplier != null)
-      .map(e => ({
-        user_id: e.user_id,
-        rate_multiplier: e.rate_multiplier as number
-      }))
+      .filter(e => e.rate_multiplier != null || e.quota_percentage != null || e.quota_percentage_5h_enabled || e.quota_percentage_7d_enabled)
+      .map(e => {
+        const entry: { user_id: number; rate_multiplier: number | null; quota_percentage?: number; quota_percentage_5h_enabled: boolean; quota_percentage_7d_enabled: boolean } = {
+          user_id: e.user_id,
+          rate_multiplier: e.rate_multiplier ?? null,
+          quota_percentage_5h_enabled: e.quota_percentage_5h_enabled ?? false,
+          quota_percentage_7d_enabled: e.quota_percentage_7d_enabled ?? false
+        }
+        if (e.quota_percentage != null) entry.quota_percentage = e.quota_percentage
+        return entry
+      })
     await adminAPI.groups.batchSetGroupRateMultipliers(props.group.id, entries)
     appStore.showSuccess(t('admin.groups.rateSaved'))
     emit('success')

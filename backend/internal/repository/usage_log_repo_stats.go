@@ -334,6 +334,21 @@ func (r *usageLogRepository) GetAccountWindowStats(ctx context.Context, accountI
 	return stats, nil
 }
 
+// GetGroupUserActualCostWindow returns the user's ActualCost and the whole
+// group's ActualCost from the same window. It is intentionally a single query
+// so the percentage gate uses one consistent snapshot.
+func (r *usageLogRepository) GetGroupUserActualCostWindow(ctx context.Context, groupID, userID int64, startTime time.Time) (userCost, totalCost float64, err error) {
+	query := `
+		SELECT
+			COALESCE(SUM(CASE WHEN user_id = $2 THEN actual_cost ELSE 0 END), 0),
+			COALESCE(SUM(actual_cost), 0)
+		FROM usage_logs
+		WHERE group_id = $1 AND created_at >= $3
+	`
+	err = scanSingleRow(ctx, r.sql, query, []any{groupID, userID, startTime}, &userCost, &totalCost)
+	return
+}
+
 // GetAccountWindowStatsBatch 批量获取同一窗口起点下多个账号的统计数据。
 // 返回 map[accountID]*AccountStats，未命中的账号会返回零值统计，便于上层直接复用。
 func (r *usageLogRepository) GetAccountWindowStatsBatch(ctx context.Context, accountIDs []int64, startTime time.Time) (map[int64]*usagestats.AccountStats, error) {

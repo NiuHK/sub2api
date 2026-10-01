@@ -467,6 +467,7 @@ type OpenAIGatewayService struct {
 	balanceNotifyService  *BalanceNotifyService
 	settingService        *SettingService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	quotaAllocationService *OpenAIQuotaAllocationService
 	liveAttestation       liveattestation.Provider
 	liveAttestationCipher SecretEncryptor
 
@@ -507,6 +508,16 @@ type OpenAIGatewayService struct {
 	// 剥离跨账号回带（openai_codex_turn_state.go）。
 	openaiCodexTurnStateOrigins sync.Map
 	openaiCodexTurnStateWrites  atomic.Uint64
+}
+
+// SetQuotaAllocationService attaches the optional per-user OpenAI quota gate.
+// Keeping it as a setter avoids changing the large gateway constructor and
+// allows Live, which selects its account inside this service, to use the same
+// gate as the HTTP handlers.
+func (s *OpenAIGatewayService) SetQuotaAllocationService(quotaService *OpenAIQuotaAllocationService) {
+	if s != nil {
+		s.quotaAllocationService = quotaService
+	}
 }
 
 // GetGroupByID resolves a group through the repository-backed scheduler snapshot service.

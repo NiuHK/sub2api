@@ -94,10 +94,10 @@ func (r *userGroupRateRepository) GetByUserIDs(ctx context.Context, userIDs []in
 	return result, nil
 }
 
-// GetByGroupID 获取指定分组下所有用户的专属配置（rate 与 rpm_override 任一非 NULL 即返回）
+// GetByGroupID 获取指定分组下所有用户的专属配置。
 func (r *userGroupRateRepository) GetByGroupID(ctx context.Context, groupID int64) ([]service.UserGroupRateEntry, error) {
 	query := `
-		SELECT ugr.user_id, u.username, u.email, COALESCE(u.notes, ''), u.status, ugr.rate_multiplier, ugr.rpm_override
+		SELECT ugr.user_id, u.username, u.email, COALESCE(u.notes, ''), u.status, ugr.rate_multiplier, ugr.rpm_override, ugr.quota_percentage, ugr.quota_percentage_5h_enabled, ugr.quota_percentage_7d_enabled
 		FROM user_group_rate_multipliers ugr
 		JOIN users u ON u.id = ugr.user_id AND u.deleted_at IS NULL
 		WHERE ugr.group_id = $1
@@ -114,7 +114,8 @@ func (r *userGroupRateRepository) GetByGroupID(ctx context.Context, groupID int6
 		var entry service.UserGroupRateEntry
 		var rate sql.NullFloat64
 		var rpm sql.NullInt32
-		if err := rows.Scan(&entry.UserID, &entry.UserName, &entry.UserEmail, &entry.UserNotes, &entry.UserStatus, &rate, &rpm); err != nil {
+		var quota sql.NullFloat64
+		if err := rows.Scan(&entry.UserID, &entry.UserName, &entry.UserEmail, &entry.UserNotes, &entry.UserStatus, &rate, &rpm, &quota, &entry.QuotaPercentage5hEnabled, &entry.QuotaPercentage7dEnabled); err != nil {
 			return nil, err
 		}
 		if rate.Valid {
@@ -125,12 +126,37 @@ func (r *userGroupRateRepository) GetByGroupID(ctx context.Context, groupID int6
 			v := int(rpm.Int32)
 			entry.RPMOverride = &v
 		}
+		if quota.Valid {
+			v := quota.Float64
+			entry.QuotaPercentage = &v
+		}
 		result = append(result, entry)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return result, nil
+}
+
+// GetQuotaAllocationByUserAndGroup returns the configured OpenAI quota percentage and window switches.
+func (r *userGroupRateRepository) GetQuotaAllocationByUserAndGroup(ctx context.Context, userID, groupID int64) (*service.OpenAIQuotaAllocationConfig, error) {
+	var quota sql.NullFloat64
+	var enabled5h, enabled7d bool
+	err := scanSingleRow(ctx, r.sql,
+		`SELECT quota_percentage, quota_percentage_5h_enabled, quota_percentage_7d_enabled FROM user_group_rate_multipliers WHERE user_id = $1 AND group_id = $2`,
+		[]any{userID, groupID}, &quota, &enabled5h, &enabled7d)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var percentage *float64
+	if quota.Valid {
+		v := quota.Float64
+		percentage = &v
+	}
+	return &service.OpenAIQuotaAllocationConfig{Percentage: percentage, Enable5h: enabled5h, Enable7d: enabled7d}, nil
 }
 
 // GetByUserAndGroup 获取用户在特定分组的专属 rate_multiplier（NULL 返回 nil）
@@ -183,7 +209,7 @@ func (r *userGroupRateRepository) SyncUserGroupRates(ctx context.Context, userID
 			return err
 		}
 		_, err := r.sql.ExecContext(ctx,
-			`DELETE FROM user_group_rate_multipliers WHERE user_id = $1 AND rate_multiplier IS NULL AND rpm_override IS NULL`,
+			`DELETE FROM user_group_rate_multipliers WHERE user_id = $1 AND rate_multiplier IS NULL AND rpm_override IS NULL AND quota_percentage IS NULL AND NOT quota_percentage_5h_enabled AND NOT quota_percentage_7d_enabled`,
 			userID)
 		return err
 	}
@@ -209,7 +235,7 @@ func (r *userGroupRateRepository) SyncUserGroupRates(ctx context.Context, userID
 			return err
 		}
 		if _, err := r.sql.ExecContext(ctx,
-			`DELETE FROM user_group_rate_multipliers WHERE user_id = $1 AND group_id = ANY($2) AND rate_multiplier IS NULL AND rpm_override IS NULL`,
+			`DELETE FROM user_group_rate_multipliers WHERE user_id = $1 AND group_id = ANY($2) AND rate_multiplier IS NULL AND rpm_override IS NULL AND quota_percentage IS NULL AND NOT quota_percentage_5h_enabled AND NOT quota_percentage_7d_enabled`,
 			userID, pq.Array(clearGroupIDs)); err != nil {
 			return err
 		}
@@ -239,11 +265,42 @@ func (r *userGroupRateRepository) SyncUserGroupRates(ctx context.Context, userID
 	return nil
 }
 
-// SyncGroupRateMultipliers 同步分组的 rate_multiplier 部分（不触动 rpm_override）。
+// SyncGroupRateMultipliers 同步分组的 rate_multiplier 与 quota_percentage
+// 部分（不触动 rpm_override）。
 // 语义：
-//   - 未出现在 entries 中的用户行：rate_multiplier 归 NULL；若 rpm_override 也为 NULL 则整行删除。
-//   - 出现的用户行：upsert rate_multiplier。
+//   - 未出现在 entries 中的用户行：rate_multiplier 与 quota 归 NULL；若 rpm_override 也为 NULL 则整行删除。
+//   - 出现的用户行：upsert rate_multiplier（允许 NULL）与 quota 配置。
 func (r *userGroupRateRepository) SyncGroupRateMultipliers(ctx context.Context, groupID int64, entries []service.GroupRateMultiplierInput) error {
+	// A save replaces the complete rate/quota portion of a group. Keep the
+	// cleanup and all upserts in one transaction so a failed write cannot leave
+	// a partially applied configuration. The advisory lock serializes saves for
+	// the same group across concurrent admin requests (the lock is released on
+	// commit/rollback).
+	if beginner, ok := r.sql.(interface {
+		sqlExecutor
+		BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+	}); ok {
+		tx, err := beginner.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, groupID); err != nil {
+			return err
+		}
+		if err := syncGroupRateMultipliers(ctx, tx, groupID, entries); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+
+	// Keep this fallback for specialized sqlExecutor implementations used by
+	// callers/tests that do not expose transaction support.
+	return syncGroupRateMultipliers(ctx, r.sql, groupID, entries)
+}
+
+func syncGroupRateMultipliers(ctx context.Context, exec sqlExecutor, groupID int64, entries []service.GroupRateMultiplierInput) error {
 	keepUserIDs := make([]int64, 0, len(entries))
 	for _, e := range entries {
 		keepUserIDs = append(keepUserIDs, e.UserID)
@@ -251,17 +308,17 @@ func (r *userGroupRateRepository) SyncGroupRateMultipliers(ctx context.Context, 
 
 	// 未在 entries 列表中的行：清空 rate_multiplier。
 	if len(keepUserIDs) == 0 {
-		if _, err := r.sql.ExecContext(ctx, `
+		if _, err := exec.ExecContext(ctx, `
 			UPDATE user_group_rate_multipliers
-			SET rate_multiplier = NULL, updated_at = NOW()
+			SET rate_multiplier = NULL, quota_percentage = NULL, quota_percentage_5h_enabled = FALSE, quota_percentage_7d_enabled = FALSE, updated_at = NOW()
 			WHERE group_id = $1
 		`, groupID); err != nil {
 			return err
 		}
 	} else {
-		if _, err := r.sql.ExecContext(ctx, `
+		if _, err := exec.ExecContext(ctx, `
 			UPDATE user_group_rate_multipliers
-			SET rate_multiplier = NULL, updated_at = NOW()
+			SET rate_multiplier = NULL, quota_percentage = NULL, quota_percentage_5h_enabled = FALSE, quota_percentage_7d_enabled = FALSE, updated_at = NOW()
 			WHERE group_id = $1 AND user_id <> ALL($2)
 		`, groupID, pq.Array(keepUserIDs)); err != nil {
 			return err
@@ -269,9 +326,9 @@ func (r *userGroupRateRepository) SyncGroupRateMultipliers(ctx context.Context, 
 	}
 
 	// 清空后若整行 NULL 则删除。
-	if _, err := r.sql.ExecContext(ctx, `
+	if _, err := exec.ExecContext(ctx, `
 		DELETE FROM user_group_rate_multipliers
-		WHERE group_id = $1 AND rate_multiplier IS NULL AND rpm_override IS NULL
+		WHERE group_id = $1 AND rate_multiplier IS NULL AND rpm_override IS NULL AND quota_percentage IS NULL AND NOT quota_percentage_5h_enabled AND NOT quota_percentage_7d_enabled
 	`, groupID); err != nil {
 		return err
 	}
@@ -280,21 +337,22 @@ func (r *userGroupRateRepository) SyncGroupRateMultipliers(ctx context.Context, 
 		return nil
 	}
 
-	userIDs := make([]int64, len(entries))
-	rates := make([]float64, len(entries))
-	for i, e := range entries {
-		userIDs[i] = e.UserID
-		rates[i] = e.RateMultiplier
-	}
 	now := time.Now()
-	_, err := r.sql.ExecContext(ctx, `
-		INSERT INTO user_group_rate_multipliers (user_id, group_id, rate_multiplier, created_at, updated_at)
-		SELECT data.user_id, $1::bigint, data.rate_multiplier, $2::timestamptz, $2::timestamptz
-		FROM unnest($3::bigint[], $4::double precision[]) AS data(user_id, rate_multiplier)
-		ON CONFLICT (user_id, group_id)
-		DO UPDATE SET rate_multiplier = EXCLUDED.rate_multiplier, updated_at = EXCLUDED.updated_at
-	`, groupID, now, pq.Array(userIDs), pq.Array(rates))
-	return err
+	for _, entry := range entries {
+		if _, err := exec.ExecContext(ctx, `
+			INSERT INTO user_group_rate_multipliers (user_id, group_id, rate_multiplier, quota_percentage, quota_percentage_5h_enabled, quota_percentage_7d_enabled, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+			ON CONFLICT (user_id, group_id)
+			DO UPDATE SET rate_multiplier = EXCLUDED.rate_multiplier,
+				quota_percentage = EXCLUDED.quota_percentage,
+				quota_percentage_5h_enabled = EXCLUDED.quota_percentage_5h_enabled,
+				quota_percentage_7d_enabled = EXCLUDED.quota_percentage_7d_enabled,
+				updated_at = EXCLUDED.updated_at
+		`, entry.UserID, groupID, entry.RateMultiplier, entry.QuotaPercentage, entry.QuotaPercentage5hEnabled, entry.QuotaPercentage7dEnabled, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SyncGroupRPMOverrides 同步分组的 rpm_override 部分（不触动 rate_multiplier）。
@@ -349,7 +407,7 @@ func (r *userGroupRateRepository) SyncGroupRPMOverrides(ctx context.Context, gro
 	// 清空后若整行 NULL 则删除。
 	if _, err := r.sql.ExecContext(ctx, `
 		DELETE FROM user_group_rate_multipliers
-		WHERE group_id = $1 AND rate_multiplier IS NULL AND rpm_override IS NULL
+		WHERE group_id = $1 AND rate_multiplier IS NULL AND rpm_override IS NULL AND quota_percentage IS NULL AND NOT quota_percentage_5h_enabled AND NOT quota_percentage_7d_enabled
 	`, groupID); err != nil {
 		return err
 	}
@@ -382,7 +440,7 @@ func (r *userGroupRateRepository) ClearGroupRPMOverrides(ctx context.Context, gr
 	}
 	_, err := r.sql.ExecContext(ctx, `
 		DELETE FROM user_group_rate_multipliers
-		WHERE group_id = $1 AND rate_multiplier IS NULL AND rpm_override IS NULL
+		WHERE group_id = $1 AND rate_multiplier IS NULL AND rpm_override IS NULL AND quota_percentage IS NULL AND NOT quota_percentage_5h_enabled AND NOT quota_percentage_7d_enabled
 	`, groupID)
 	return err
 }

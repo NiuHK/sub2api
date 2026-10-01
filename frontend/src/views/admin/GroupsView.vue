@@ -421,7 +421,7 @@
                 }}</span>
               </button>
               <button
-                v-if="!authStore.isSimpleMode"
+                v-if="canUseUserGroupQuota(row)"
                 data-testid="group-rate-multipliers"
                 @click="handleRateMultipliers(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
@@ -6416,6 +6416,10 @@ const removeEditMessagesDispatchMapping = (row: MessagesDispatchMappingRow) => {
 const handleRateMultipliers = (group: AdminGroup) => {
   rateMultipliersGroup.value = group;
   showRateMultipliersModal.value = true;
+};
+
+const canUseUserGroupQuota = (group: AdminGroup) => {
+  return !authStore.isSimpleMode && group.account_count === 1 && group.require_oauth_only === true;
 };
 
 const handleRPMOverrides = (group: AdminGroup) => {

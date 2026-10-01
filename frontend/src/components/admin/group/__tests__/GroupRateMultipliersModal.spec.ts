@@ -53,6 +53,69 @@ describe('GroupRateMultipliersModal new override validation', () => {
     await wrapper.findAll('button').find(b => b.text() === 'common.add')!.trigger('click')
     await wrapper.findAll('button').find(b => b.text() === 'common.save')!.trigger('click')
     await flushPromises()
-    expect(mocks.batchSetGroupRateMultipliers).toHaveBeenCalledWith(1, [{ user_id: 7, rate_multiplier: value }])
+    expect(mocks.batchSetGroupRateMultipliers).toHaveBeenCalledWith(1, [{
+      user_id: 7,
+      rate_multiplier: value,
+      quota_percentage_5h_enabled: false,
+      quota_percentage_7d_enabled: false
+    }])
+  })
+
+  it('saves quota percentage and both window switches', async () => {
+    const wrapper = await selectUser()
+    await wrapper.get('input[placeholder="1.0"]').setValue('1')
+    await wrapper.get('input[placeholder="admin.groups.quotaPercentage"]').setValue('25')
+    const switches = wrapper.findAll('[role="switch"]')
+    expect(switches).toHaveLength(2)
+    await switches[0].trigger('click')
+    await switches[1].trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === 'common.add')!.trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === 'common.save')!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.batchSetGroupRateMultipliers).toHaveBeenCalledWith(1, [{
+      user_id: 7,
+      rate_multiplier: 1,
+      quota_percentage: 25,
+      quota_percentage_5h_enabled: true,
+      quota_percentage_7d_enabled: true
+    }])
+  })
+
+  it('preserves a quota-only entry whose rate multiplier is null', async () => {
+    mocks.getGroupRateMultipliers.mockResolvedValueOnce([{
+      user_id: 7,
+      user_name: '',
+      user_email: 'user@example.com',
+      user_notes: '',
+      user_status: 'active',
+      rate_multiplier: null,
+      quota_percentage: 30,
+      quota_percentage_5h_enabled: true,
+      quota_percentage_7d_enabled: false
+    }])
+
+    const wrapper = mount(GroupRateMultipliersModal, {
+      props: { show: false, group: { id: 1, name: 'Group', platform: 'openai' } as AdminGroup },
+      global: { stubs: {
+        BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' },
+        Icon: true, PlatformIcon: true, Pagination: true
+      } }
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    const quotaInput = wrapper.get('input[placeholder="不限"]')
+    await quotaInput.setValue('31')
+    await quotaInput.trigger('change')
+    await wrapper.findAll('button').find(b => b.text() === 'common.save')!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.batchSetGroupRateMultipliers).toHaveBeenCalledWith(1, [{
+      user_id: 7,
+      rate_multiplier: null,
+      quota_percentage: 31,
+      quota_percentage_5h_enabled: true,
+      quota_percentage_7d_enabled: false
+    }])
   })
 })

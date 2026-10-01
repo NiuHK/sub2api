@@ -161,6 +161,12 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		}
 
 		account := selection.Account
+		if !h.checkOpenAIQuotaAllocation(c, subject.UserID, apiKey.GroupID, account, false) {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			return
+		}
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 		accountRelease, slotResult := h.acquireResponsesAccountSlot(c, apiKey.GroupID, sessionHash, selection, false, &streamStarted, reqLog)
 		if slotResult == openAISlotAcquireProfitVetoed {
