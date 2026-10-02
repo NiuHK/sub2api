@@ -187,6 +187,23 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 			slog.Error("increment account quota used failed", "account_id", p.Account.ID, "cost", accountCost, "error", err)
 		}
 	}
+	if p.Account != nil && p.Account.IsOpenAIOAuth() && cost.TotalCost > 0 && deps.accountUserQuotaShareService != nil {
+		shareCost := cost.TotalCost * p.AccountRateMultiplier
+		for _, window := range []struct {
+			kind    string
+			resetAt *time.Time
+		}{
+			{kind: "five_hour", resetAt: quotaShareResetTimeFromExtra(p.Account.Extra, "codex_5h_reset_at")},
+			{kind: "seven_day", resetAt: quotaShareResetTimeFromExtra(p.Account.Extra, "codex_7d_reset_at")},
+		} {
+			if window.resetAt == nil {
+				continue
+			}
+			if err := deps.accountUserQuotaShareService.RecordUsage(billingCtx, p.Account.ID, p.User.ID, window.kind, *window.resetAt, shareCost); err != nil {
+				slog.Error("record account user quota share usage failed", "account_id", p.Account.ID, "user_id", p.User.ID, "window", window.kind, "error", err)
+			}
+		}
+	}
 
 	// Platform quota 累加（legacy 兜底路径）：仅对 standard（余额）模式生效；订阅模式豁免；仅对有 limit 的用户写
 	//   - HasUserPlatformQuotaLimit 守卫:与正常路径对齐，无 limit 公司跳过
@@ -345,9 +362,38 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	if p.shouldUpdateAccountQuota() {
 		cmd.AccountQuotaCost = p.Cost.TotalCost * p.AccountRateMultiplier
 	}
+	if p.Cost.TotalCost > 0 && p.Account.IsOpenAIOAuth() {
+		cmd.CodexShareCost = p.Cost.TotalCost * p.AccountRateMultiplier
+		cmd.CodexShareFiveHourResetAt = quotaShareResetTimeFromExtra(p.Account.Extra, "codex_5h_reset_at")
+		cmd.CodexShareSevenDayResetAt = quotaShareResetTimeFromExtra(p.Account.Extra, "codex_7d_reset_at")
+	}
 
 	cmd.Normalize()
 	return cmd
+}
+
+func quotaShareResetTimeFromExtra(extra map[string]any, key string) *time.Time {
+	if extra == nil {
+		return nil
+	}
+	value, ok := extra[key]
+	if !ok {
+		return nil
+	}
+	var parsed time.Time
+	switch v := value.(type) {
+	case time.Time:
+		parsed = v
+	case string:
+		parsed, _ = time.Parse(time.RFC3339, strings.TrimSpace(v))
+	default:
+		return nil
+	}
+	if parsed.IsZero() {
+		return nil
+	}
+	parsed = parsed.UTC()
+	return &parsed
 }
 
 func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog, p *postUsageBillingParams, deps *billingDeps, repo UsageBillingRepository) (bool, error) {
@@ -579,26 +625,28 @@ func detachUpstreamContext(ctx context.Context) (context.Context, context.Cancel
 
 // billingDeps 扣费逻辑依赖的服务（由各 gateway service 提供）
 type billingDeps struct {
-	accountRepo           AccountRepository
-	userRepo              UserRepository
-	userSubRepo           UserSubscriptionRepository
-	billingCacheService   *BillingCacheService
-	deferredService       *DeferredService
-	balanceNotifyService  *BalanceNotifyService
-	userPlatformQuotaRepo UserPlatformQuotaRepository
-	cfg                   *config.Config
+	accountRepo                  AccountRepository
+	userRepo                     UserRepository
+	userSubRepo                  UserSubscriptionRepository
+	billingCacheService          *BillingCacheService
+	deferredService              *DeferredService
+	balanceNotifyService         *BalanceNotifyService
+	userPlatformQuotaRepo        UserPlatformQuotaRepository
+	accountUserQuotaShareService AccountUserQuotaShareService
+	cfg                          *config.Config
 }
 
 func (s *GatewayService) billingDeps() *billingDeps {
 	return &billingDeps{
-		accountRepo:           s.accountRepo,
-		userRepo:              s.userRepo,
-		userSubRepo:           s.userSubRepo,
-		billingCacheService:   s.billingCacheService,
-		deferredService:       s.deferredService,
-		balanceNotifyService:  s.balanceNotifyService,
-		userPlatformQuotaRepo: s.userPlatformQuotaRepo,
-		cfg:                   s.cfg,
+		accountRepo:                  s.accountRepo,
+		userRepo:                     s.userRepo,
+		userSubRepo:                  s.userSubRepo,
+		billingCacheService:          s.billingCacheService,
+		deferredService:              s.deferredService,
+		balanceNotifyService:         s.balanceNotifyService,
+		userPlatformQuotaRepo:        s.userPlatformQuotaRepo,
+		accountUserQuotaShareService: s.accountUserQuotaShareService,
+		cfg:                          s.cfg,
 	}
 }
 

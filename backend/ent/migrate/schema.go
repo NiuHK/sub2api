@@ -261,6 +261,122 @@ var (
 			},
 		},
 	}
+	// AccountQuotaShareUsagesColumns holds the columns for the "account_quota_share_usages" table.
+	AccountQuotaShareUsagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "window_kind", Type: field.TypeString, Size: 20},
+		{Name: "reset_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "account_id", Type: field.TypeInt64},
+	}
+	// AccountQuotaShareUsagesTable holds the schema information for the "account_quota_share_usages" table.
+	AccountQuotaShareUsagesTable = &schema.Table{
+		Name:       "account_quota_share_usages",
+		Columns:    AccountQuotaShareUsagesColumns,
+		PrimaryKey: []*schema.Column{AccountQuotaShareUsagesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "account_quota_share_usages_accounts_quota_share_usages",
+				Columns:    []*schema.Column{AccountQuotaShareUsagesColumns[4]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "accountquotashareusage_account_id_window_kind_reset_at",
+				Unique:  true,
+				Columns: []*schema.Column{AccountQuotaShareUsagesColumns[4], AccountQuotaShareUsagesColumns[1], AccountQuotaShareUsagesColumns[2]},
+			},
+		},
+	}
+	// AccountUserQuotaSharesColumns holds the columns for the "account_user_quota_shares" table.
+	AccountUserQuotaSharesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "five_hour_percent", Type: field.TypeFloat64, Default: -1, SchemaType: map[string]string{"postgres": "decimal(7,4)"}},
+		{Name: "seven_day_percent", Type: field.TypeFloat64, Default: -1, SchemaType: map[string]string{"postgres": "decimal(7,4)"}},
+		{Name: "account_id", Type: field.TypeInt64},
+		{Name: "user_id", Type: field.TypeInt64},
+	}
+	// AccountUserQuotaSharesTable holds the schema information for the "account_user_quota_shares" table.
+	AccountUserQuotaSharesTable = &schema.Table{
+		Name:       "account_user_quota_shares",
+		Columns:    AccountUserQuotaSharesColumns,
+		PrimaryKey: []*schema.Column{AccountUserQuotaSharesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "account_user_quota_shares_accounts_user_quota_shares",
+				Columns:    []*schema.Column{AccountUserQuotaSharesColumns[6]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "account_user_quota_shares_users_account_quota_shares",
+				Columns:    []*schema.Column{AccountUserQuotaSharesColumns[7]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "accountuserquotashare_account_id_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{AccountUserQuotaSharesColumns[6], AccountUserQuotaSharesColumns[7]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL",
+				},
+			},
+			{
+				Name:    "accountuserquotashare_account_id",
+				Unique:  false,
+				Columns: []*schema.Column{AccountUserQuotaSharesColumns[6]},
+			},
+			{
+				Name:    "accountuserquotashare_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{AccountUserQuotaSharesColumns[7]},
+			},
+		},
+	}
+	// AccountUserQuotaShareUsagesColumns holds the columns for the "account_user_quota_share_usages" table.
+	AccountUserQuotaShareUsagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "window_kind", Type: field.TypeString, Size: 20},
+		{Name: "reset_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
+		{Name: "account_id", Type: field.TypeInt64},
+		{Name: "user_id", Type: field.TypeInt64},
+	}
+	// AccountUserQuotaShareUsagesTable holds the schema information for the "account_user_quota_share_usages" table.
+	AccountUserQuotaShareUsagesTable = &schema.Table{
+		Name:       "account_user_quota_share_usages",
+		Columns:    AccountUserQuotaShareUsagesColumns,
+		PrimaryKey: []*schema.Column{AccountUserQuotaShareUsagesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "account_user_quota_share_usages_accounts_user_quota_share_usages",
+				Columns:    []*schema.Column{AccountUserQuotaShareUsagesColumns[4]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "account_user_quota_share_usages_users_quota_share_usages",
+				Columns:    []*schema.Column{AccountUserQuotaShareUsagesColumns[5]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "accountuserquotashareusage_account_id_user_id_window_kind_reset_at",
+				Unique:  true,
+				Columns: []*schema.Column{AccountUserQuotaShareUsagesColumns[4], AccountUserQuotaShareUsagesColumns[5], AccountUserQuotaShareUsagesColumns[1], AccountUserQuotaShareUsagesColumns[2]},
+			},
+		},
+	}
 	// AnnouncementsColumns holds the columns for the "announcements" table.
 	AnnouncementsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -2093,6 +2209,9 @@ var (
 		APIKeysTable,
 		AccountsTable,
 		AccountGroupsTable,
+		AccountQuotaShareUsagesTable,
+		AccountUserQuotaSharesTable,
+		AccountUserQuotaShareUsagesTable,
 		AnnouncementsTable,
 		AnnouncementReadsTable,
 		AuthIdentitiesTable,
@@ -2147,6 +2266,20 @@ func init() {
 	AccountGroupsTable.ForeignKeys[1].RefTable = GroupsTable
 	AccountGroupsTable.Annotation = &entsql.Annotation{
 		Table: "account_groups",
+	}
+	AccountQuotaShareUsagesTable.ForeignKeys[0].RefTable = AccountsTable
+	AccountQuotaShareUsagesTable.Annotation = &entsql.Annotation{
+		Table: "account_quota_share_usages",
+	}
+	AccountUserQuotaSharesTable.ForeignKeys[0].RefTable = AccountsTable
+	AccountUserQuotaSharesTable.ForeignKeys[1].RefTable = UsersTable
+	AccountUserQuotaSharesTable.Annotation = &entsql.Annotation{
+		Table: "account_user_quota_shares",
+	}
+	AccountUserQuotaShareUsagesTable.ForeignKeys[0].RefTable = AccountsTable
+	AccountUserQuotaShareUsagesTable.ForeignKeys[1].RefTable = UsersTable
+	AccountUserQuotaShareUsagesTable.Annotation = &entsql.Annotation{
+		Table: "account_user_quota_share_usages",
 	}
 	AnnouncementsTable.Annotation = &entsql.Annotation{
 		Table: "announcements",

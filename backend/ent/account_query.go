@@ -15,6 +15,9 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/accountquotashareusage"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashare"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashareusage"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
@@ -24,17 +27,20 @@ import (
 // AccountQuery is the builder for querying Account entities.
 type AccountQuery struct {
 	config
-	ctx               *QueryContext
-	order             []account.OrderOption
-	inters            []Interceptor
-	predicates        []predicate.Account
-	withGroups        *GroupQuery
-	withProxy         *ProxyQuery
-	withParent        *AccountQuery
-	withChildren      *AccountQuery
-	withUsageLogs     *UsageLogQuery
-	withAccountGroups *AccountGroupQuery
-	modifiers         []func(*sql.Selector)
+	ctx                      *QueryContext
+	order                    []account.OrderOption
+	inters                   []Interceptor
+	predicates               []predicate.Account
+	withGroups               *GroupQuery
+	withProxy                *ProxyQuery
+	withParent               *AccountQuery
+	withChildren             *AccountQuery
+	withUsageLogs            *UsageLogQuery
+	withUserQuotaShares      *AccountUserQuotaShareQuery
+	withQuotaShareUsages     *AccountQuotaShareUsageQuery
+	withUserQuotaShareUsages *AccountUserQuotaShareUsageQuery
+	withAccountGroups        *AccountGroupQuery
+	modifiers                []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -174,6 +180,72 @@ func (_q *AccountQuery) QueryUsageLogs() *UsageLogQuery {
 			sqlgraph.From(account.Table, account.FieldID, selector),
 			sqlgraph.To(usagelog.Table, usagelog.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, account.UsageLogsTable, account.UsageLogsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryUserQuotaShares chains the current query on the "user_quota_shares" edge.
+func (_q *AccountQuery) QueryUserQuotaShares() *AccountUserQuotaShareQuery {
+	query := (&AccountUserQuotaShareClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, selector),
+			sqlgraph.To(accountuserquotashare.Table, accountuserquotashare.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.UserQuotaSharesTable, account.UserQuotaSharesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryQuotaShareUsages chains the current query on the "quota_share_usages" edge.
+func (_q *AccountQuery) QueryQuotaShareUsages() *AccountQuotaShareUsageQuery {
+	query := (&AccountQuotaShareUsageClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, selector),
+			sqlgraph.To(accountquotashareusage.Table, accountquotashareusage.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.QuotaShareUsagesTable, account.QuotaShareUsagesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryUserQuotaShareUsages chains the current query on the "user_quota_share_usages" edge.
+func (_q *AccountQuery) QueryUserQuotaShareUsages() *AccountUserQuotaShareUsageQuery {
+	query := (&AccountUserQuotaShareUsageClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, selector),
+			sqlgraph.To(accountuserquotashareusage.Table, accountuserquotashareusage.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.UserQuotaShareUsagesTable, account.UserQuotaShareUsagesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -390,17 +462,20 @@ func (_q *AccountQuery) Clone() *AccountQuery {
 		return nil
 	}
 	return &AccountQuery{
-		config:            _q.config,
-		ctx:               _q.ctx.Clone(),
-		order:             append([]account.OrderOption{}, _q.order...),
-		inters:            append([]Interceptor{}, _q.inters...),
-		predicates:        append([]predicate.Account{}, _q.predicates...),
-		withGroups:        _q.withGroups.Clone(),
-		withProxy:         _q.withProxy.Clone(),
-		withParent:        _q.withParent.Clone(),
-		withChildren:      _q.withChildren.Clone(),
-		withUsageLogs:     _q.withUsageLogs.Clone(),
-		withAccountGroups: _q.withAccountGroups.Clone(),
+		config:                   _q.config,
+		ctx:                      _q.ctx.Clone(),
+		order:                    append([]account.OrderOption{}, _q.order...),
+		inters:                   append([]Interceptor{}, _q.inters...),
+		predicates:               append([]predicate.Account{}, _q.predicates...),
+		withGroups:               _q.withGroups.Clone(),
+		withProxy:                _q.withProxy.Clone(),
+		withParent:               _q.withParent.Clone(),
+		withChildren:             _q.withChildren.Clone(),
+		withUsageLogs:            _q.withUsageLogs.Clone(),
+		withUserQuotaShares:      _q.withUserQuotaShares.Clone(),
+		withQuotaShareUsages:     _q.withQuotaShareUsages.Clone(),
+		withUserQuotaShareUsages: _q.withUserQuotaShareUsages.Clone(),
+		withAccountGroups:        _q.withAccountGroups.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -459,6 +534,39 @@ func (_q *AccountQuery) WithUsageLogs(opts ...func(*UsageLogQuery)) *AccountQuer
 		opt(query)
 	}
 	_q.withUsageLogs = query
+	return _q
+}
+
+// WithUserQuotaShares tells the query-builder to eager-load the nodes that are connected to
+// the "user_quota_shares" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *AccountQuery) WithUserQuotaShares(opts ...func(*AccountUserQuotaShareQuery)) *AccountQuery {
+	query := (&AccountUserQuotaShareClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withUserQuotaShares = query
+	return _q
+}
+
+// WithQuotaShareUsages tells the query-builder to eager-load the nodes that are connected to
+// the "quota_share_usages" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *AccountQuery) WithQuotaShareUsages(opts ...func(*AccountQuotaShareUsageQuery)) *AccountQuery {
+	query := (&AccountQuotaShareUsageClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withQuotaShareUsages = query
+	return _q
+}
+
+// WithUserQuotaShareUsages tells the query-builder to eager-load the nodes that are connected to
+// the "user_quota_share_usages" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *AccountQuery) WithUserQuotaShareUsages(opts ...func(*AccountUserQuotaShareUsageQuery)) *AccountQuery {
+	query := (&AccountUserQuotaShareUsageClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withUserQuotaShareUsages = query
 	return _q
 }
 
@@ -551,12 +659,15 @@ func (_q *AccountQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Acco
 	var (
 		nodes       = []*Account{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [9]bool{
 			_q.withGroups != nil,
 			_q.withProxy != nil,
 			_q.withParent != nil,
 			_q.withChildren != nil,
 			_q.withUsageLogs != nil,
+			_q.withUserQuotaShares != nil,
+			_q.withQuotaShareUsages != nil,
+			_q.withUserQuotaShareUsages != nil,
 			_q.withAccountGroups != nil,
 		}
 	)
@@ -611,6 +722,33 @@ func (_q *AccountQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Acco
 		if err := _q.loadUsageLogs(ctx, query, nodes,
 			func(n *Account) { n.Edges.UsageLogs = []*UsageLog{} },
 			func(n *Account, e *UsageLog) { n.Edges.UsageLogs = append(n.Edges.UsageLogs, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withUserQuotaShares; query != nil {
+		if err := _q.loadUserQuotaShares(ctx, query, nodes,
+			func(n *Account) { n.Edges.UserQuotaShares = []*AccountUserQuotaShare{} },
+			func(n *Account, e *AccountUserQuotaShare) {
+				n.Edges.UserQuotaShares = append(n.Edges.UserQuotaShares, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withQuotaShareUsages; query != nil {
+		if err := _q.loadQuotaShareUsages(ctx, query, nodes,
+			func(n *Account) { n.Edges.QuotaShareUsages = []*AccountQuotaShareUsage{} },
+			func(n *Account, e *AccountQuotaShareUsage) {
+				n.Edges.QuotaShareUsages = append(n.Edges.QuotaShareUsages, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withUserQuotaShareUsages; query != nil {
+		if err := _q.loadUserQuotaShareUsages(ctx, query, nodes,
+			func(n *Account) { n.Edges.UserQuotaShareUsages = []*AccountUserQuotaShareUsage{} },
+			func(n *Account, e *AccountUserQuotaShareUsage) {
+				n.Edges.UserQuotaShareUsages = append(n.Edges.UserQuotaShareUsages, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -797,6 +935,96 @@ func (_q *AccountQuery) loadUsageLogs(ctx context.Context, query *UsageLogQuery,
 	}
 	query.Where(predicate.UsageLog(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(account.UsageLogsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.AccountID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "account_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *AccountQuery) loadUserQuotaShares(ctx context.Context, query *AccountUserQuotaShareQuery, nodes []*Account, init func(*Account), assign func(*Account, *AccountUserQuotaShare)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Account)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(accountuserquotashare.FieldAccountID)
+	}
+	query.Where(predicate.AccountUserQuotaShare(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(account.UserQuotaSharesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.AccountID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "account_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *AccountQuery) loadQuotaShareUsages(ctx context.Context, query *AccountQuotaShareUsageQuery, nodes []*Account, init func(*Account), assign func(*Account, *AccountQuotaShareUsage)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Account)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(accountquotashareusage.FieldAccountID)
+	}
+	query.Where(predicate.AccountQuotaShareUsage(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(account.QuotaShareUsagesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.AccountID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "account_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *AccountQuery) loadUserQuotaShareUsages(ctx context.Context, query *AccountUserQuotaShareUsageQuery, nodes []*Account, init func(*Account), assign func(*Account, *AccountUserQuotaShareUsage)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Account)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(accountuserquotashareusage.FieldAccountID)
+	}
+	query.Where(predicate.AccountUserQuotaShareUsage(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(account.UserQuotaShareUsagesColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

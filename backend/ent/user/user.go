@@ -91,6 +91,10 @@ const (
 	EdgePendingAuthSessions = "pending_auth_sessions"
 	// EdgePlatformQuotas holds the string denoting the platform_quotas edge name in mutations.
 	EdgePlatformQuotas = "platform_quotas"
+	// EdgeAccountQuotaShares holds the string denoting the account_quota_shares edge name in mutations.
+	EdgeAccountQuotaShares = "account_quota_shares"
+	// EdgeQuotaShareUsages holds the string denoting the quota_share_usages edge name in mutations.
+	EdgeQuotaShareUsages = "quota_share_usages"
 	// EdgeUserAllowedGroups holds the string denoting the user_allowed_groups edge name in mutations.
 	EdgeUserAllowedGroups = "user_allowed_groups"
 	// Table holds the table name of the user in the database.
@@ -184,6 +188,20 @@ const (
 	PlatformQuotasInverseTable = "user_platform_quotas"
 	// PlatformQuotasColumn is the table column denoting the platform_quotas relation/edge.
 	PlatformQuotasColumn = "user_id"
+	// AccountQuotaSharesTable is the table that holds the account_quota_shares relation/edge.
+	AccountQuotaSharesTable = "account_user_quota_shares"
+	// AccountQuotaSharesInverseTable is the table name for the AccountUserQuotaShare entity.
+	// It exists in this package in order to avoid circular dependency with the "accountuserquotashare" package.
+	AccountQuotaSharesInverseTable = "account_user_quota_shares"
+	// AccountQuotaSharesColumn is the table column denoting the account_quota_shares relation/edge.
+	AccountQuotaSharesColumn = "user_id"
+	// QuotaShareUsagesTable is the table that holds the quota_share_usages relation/edge.
+	QuotaShareUsagesTable = "account_user_quota_share_usages"
+	// QuotaShareUsagesInverseTable is the table name for the AccountUserQuotaShareUsage entity.
+	// It exists in this package in order to avoid circular dependency with the "accountuserquotashareusage" package.
+	QuotaShareUsagesInverseTable = "account_user_quota_share_usages"
+	// QuotaShareUsagesColumn is the table column denoting the quota_share_usages relation/edge.
+	QuotaShareUsagesColumn = "user_id"
 	// UserAllowedGroupsTable is the table that holds the user_allowed_groups relation/edge.
 	UserAllowedGroupsTable = "user_allowed_groups"
 	// UserAllowedGroupsInverseTable is the table name for the UserAllowedGroup entity.
@@ -612,6 +630,34 @@ func ByPlatformQuotas(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByAccountQuotaSharesCount orders the results by account_quota_shares count.
+func ByAccountQuotaSharesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newAccountQuotaSharesStep(), opts...)
+	}
+}
+
+// ByAccountQuotaShares orders the results by account_quota_shares terms.
+func ByAccountQuotaShares(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAccountQuotaSharesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByQuotaShareUsagesCount orders the results by quota_share_usages count.
+func ByQuotaShareUsagesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newQuotaShareUsagesStep(), opts...)
+	}
+}
+
+// ByQuotaShareUsages orders the results by quota_share_usages terms.
+func ByQuotaShareUsages(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newQuotaShareUsagesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByUserAllowedGroupsCount orders the results by user_allowed_groups count.
 func ByUserAllowedGroupsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -714,6 +760,20 @@ func newPlatformQuotasStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PlatformQuotasInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, PlatformQuotasTable, PlatformQuotasColumn),
+	)
+}
+func newAccountQuotaSharesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(AccountQuotaSharesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, AccountQuotaSharesTable, AccountQuotaSharesColumn),
+	)
+}
+func newQuotaShareUsagesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(QuotaShareUsagesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, QuotaShareUsagesTable, QuotaShareUsagesColumn),
 	)
 }
 func newUserAllowedGroupsStep() *sqlgraph.Step {

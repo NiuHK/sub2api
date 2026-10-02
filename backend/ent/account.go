@@ -99,11 +99,17 @@ type AccountEdges struct {
 	Children []*Account `json:"children,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
+	// UserQuotaShares holds the value of the user_quota_shares edge.
+	UserQuotaShares []*AccountUserQuotaShare `json:"user_quota_shares,omitempty"`
+	// QuotaShareUsages holds the value of the quota_share_usages edge.
+	QuotaShareUsages []*AccountQuotaShareUsage `json:"quota_share_usages,omitempty"`
+	// UserQuotaShareUsages holds the value of the user_quota_share_usages edge.
+	UserQuotaShareUsages []*AccountUserQuotaShareUsage `json:"user_quota_share_usages,omitempty"`
 	// AccountGroups holds the value of the account_groups edge.
 	AccountGroups []*AccountGroup `json:"account_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [9]bool
 }
 
 // GroupsOrErr returns the Groups value or an error if the edge
@@ -155,10 +161,37 @@ func (e AccountEdges) UsageLogsOrErr() ([]*UsageLog, error) {
 	return nil, &NotLoadedError{edge: "usage_logs"}
 }
 
+// UserQuotaSharesOrErr returns the UserQuotaShares value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) UserQuotaSharesOrErr() ([]*AccountUserQuotaShare, error) {
+	if e.loadedTypes[5] {
+		return e.UserQuotaShares, nil
+	}
+	return nil, &NotLoadedError{edge: "user_quota_shares"}
+}
+
+// QuotaShareUsagesOrErr returns the QuotaShareUsages value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) QuotaShareUsagesOrErr() ([]*AccountQuotaShareUsage, error) {
+	if e.loadedTypes[6] {
+		return e.QuotaShareUsages, nil
+	}
+	return nil, &NotLoadedError{edge: "quota_share_usages"}
+}
+
+// UserQuotaShareUsagesOrErr returns the UserQuotaShareUsages value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) UserQuotaShareUsagesOrErr() ([]*AccountUserQuotaShareUsage, error) {
+	if e.loadedTypes[7] {
+		return e.UserQuotaShareUsages, nil
+	}
+	return nil, &NotLoadedError{edge: "user_quota_share_usages"}
+}
+
 // AccountGroupsOrErr returns the AccountGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) AccountGroupsOrErr() ([]*AccountGroup, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[8] {
 		return e.AccountGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "account_groups"}
@@ -445,6 +478,21 @@ func (_m *Account) QueryChildren() *AccountQuery {
 // QueryUsageLogs queries the "usage_logs" edge of the Account entity.
 func (_m *Account) QueryUsageLogs() *UsageLogQuery {
 	return NewAccountClient(_m.config).QueryUsageLogs(_m)
+}
+
+// QueryUserQuotaShares queries the "user_quota_shares" edge of the Account entity.
+func (_m *Account) QueryUserQuotaShares() *AccountUserQuotaShareQuery {
+	return NewAccountClient(_m.config).QueryUserQuotaShares(_m)
+}
+
+// QueryQuotaShareUsages queries the "quota_share_usages" edge of the Account entity.
+func (_m *Account) QueryQuotaShareUsages() *AccountQuotaShareUsageQuery {
+	return NewAccountClient(_m.config).QueryQuotaShareUsages(_m)
+}
+
+// QueryUserQuotaShareUsages queries the "user_quota_share_usages" edge of the Account entity.
+func (_m *Account) QueryUserQuotaShareUsages() *AccountUserQuotaShareUsageQuery {
+	return NewAccountClient(_m.config).QueryUserQuotaShareUsages(_m)
 }
 
 // QueryAccountGroups queries the "account_groups" edge of the Account entity.

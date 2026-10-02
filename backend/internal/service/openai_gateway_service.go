@@ -439,36 +439,41 @@ var defaultOpenAICodexSnapshotPersistThrottle = newAccountWriteThrottle(openAICo
 // needs compact support but no compatible account is available.
 var ErrNoAvailableCompactAccounts = errors.New("no available accounts support /responses/compact")
 
+// ErrAccountUserQuotaShareExhausted indicates that account selection was
+// blocked by the configured per-user Codex quota share.
+var ErrAccountUserQuotaShareExhausted = errors.New("account user quota share exhausted")
+
 // OpenAIGatewayService handles OpenAI API gateway operations
 type OpenAIGatewayService struct {
-	accountRepo           AccountRepository
-	usageLogRepo          UsageLogRepository
-	usageBillingRepo      UsageBillingRepository
-	userRepo              UserRepository
-	userSubRepo           UserSubscriptionRepository
-	cache                 GatewayCache
-	cfg                   *config.Config
-	codexDetector         CodexClientRestrictionDetector
-	schedulerSnapshot     *SchedulerSnapshotService
-	concurrencyService    *ConcurrencyService
-	billingService        *BillingService
-	rateLimitService      *RateLimitService
-	billingCacheService   *BillingCacheService
-	userGroupRateResolver *userGroupRateResolver
-	httpUpstream          HTTPUpstream
-	pluginManager         *PluginManager
-	deferredService       *DeferredService
-	openAITokenProvider   *OpenAITokenProvider
-	grokTokenProvider     *GrokTokenProvider
-	toolCorrector         *CodexToolCorrector
-	openaiWSResolver      OpenAIWSProtocolResolver
-	resolver              *ModelPricingResolver
-	channelService        *ChannelService
-	balanceNotifyService  *BalanceNotifyService
-	settingService        *SettingService
-	userPlatformQuotaRepo UserPlatformQuotaRepository
-	liveAttestation       liveattestation.Provider
-	liveAttestationCipher SecretEncryptor
+	accountRepo                  AccountRepository
+	usageLogRepo                 UsageLogRepository
+	usageBillingRepo             UsageBillingRepository
+	userRepo                     UserRepository
+	userSubRepo                  UserSubscriptionRepository
+	cache                        GatewayCache
+	cfg                          *config.Config
+	codexDetector                CodexClientRestrictionDetector
+	schedulerSnapshot            *SchedulerSnapshotService
+	concurrencyService           *ConcurrencyService
+	billingService               *BillingService
+	rateLimitService             *RateLimitService
+	billingCacheService          *BillingCacheService
+	userGroupRateResolver        *userGroupRateResolver
+	httpUpstream                 HTTPUpstream
+	pluginManager                *PluginManager
+	deferredService              *DeferredService
+	openAITokenProvider          *OpenAITokenProvider
+	grokTokenProvider            *GrokTokenProvider
+	toolCorrector                *CodexToolCorrector
+	openaiWSResolver             OpenAIWSProtocolResolver
+	resolver                     *ModelPricingResolver
+	channelService               *ChannelService
+	balanceNotifyService         *BalanceNotifyService
+	settingService               *SettingService
+	userPlatformQuotaRepo        UserPlatformQuotaRepository
+	accountUserQuotaShareService AccountUserQuotaShareService
+	liveAttestation              liveattestation.Provider
+	liveAttestationCipher        SecretEncryptor
 
 	openaiWSPoolOnce               sync.Once
 	openaiWSStateStoreOnce         sync.Once
@@ -507,6 +512,15 @@ type OpenAIGatewayService struct {
 	// 剥离跨账号回带（openai_codex_turn_state.go）。
 	openaiCodexTurnStateOrigins sync.Map
 	openaiCodexTurnStateWrites  atomic.Uint64
+}
+
+// SetAccountUserQuotaShareService attaches the optional account-level quota
+// sharing evaluator. Keeping this as a setter preserves the constructor shape
+// used by the extensive gateway unit-test fixture set.
+func (s *OpenAIGatewayService) SetAccountUserQuotaShareService(quota AccountUserQuotaShareService) {
+	if s != nil {
+		s.accountUserQuotaShareService = quota
+	}
 }
 
 // GetGroupByID resolves a group through the repository-backed scheduler snapshot service.
@@ -691,13 +705,14 @@ func (s *OpenAIGatewayService) getCodexSnapshotThrottle() *accountWriteThrottle 
 
 func (s *OpenAIGatewayService) billingDeps() *billingDeps {
 	return &billingDeps{
-		accountRepo:           s.accountRepo,
-		userRepo:              s.userRepo,
-		userSubRepo:           s.userSubRepo,
-		billingCacheService:   s.billingCacheService,
-		deferredService:       s.deferredService,
-		balanceNotifyService:  s.balanceNotifyService,
-		userPlatformQuotaRepo: s.userPlatformQuotaRepo,
+		accountRepo:                  s.accountRepo,
+		userRepo:                     s.userRepo,
+		userSubRepo:                  s.userSubRepo,
+		billingCacheService:          s.billingCacheService,
+		deferredService:              s.deferredService,
+		balanceNotifyService:         s.balanceNotifyService,
+		userPlatformQuotaRepo:        s.userPlatformQuotaRepo,
+		accountUserQuotaShareService: s.accountUserQuotaShareService,
 	}
 }
 

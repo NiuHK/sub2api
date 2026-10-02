@@ -88,6 +88,12 @@ const (
 	EdgeChildren = "children"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
+	// EdgeUserQuotaShares holds the string denoting the user_quota_shares edge name in mutations.
+	EdgeUserQuotaShares = "user_quota_shares"
+	// EdgeQuotaShareUsages holds the string denoting the quota_share_usages edge name in mutations.
+	EdgeQuotaShareUsages = "quota_share_usages"
+	// EdgeUserQuotaShareUsages holds the string denoting the user_quota_share_usages edge name in mutations.
+	EdgeUserQuotaShareUsages = "user_quota_share_usages"
 	// EdgeAccountGroups holds the string denoting the account_groups edge name in mutations.
 	EdgeAccountGroups = "account_groups"
 	// Table holds the table name of the account in the database.
@@ -119,6 +125,27 @@ const (
 	UsageLogsInverseTable = "usage_logs"
 	// UsageLogsColumn is the table column denoting the usage_logs relation/edge.
 	UsageLogsColumn = "account_id"
+	// UserQuotaSharesTable is the table that holds the user_quota_shares relation/edge.
+	UserQuotaSharesTable = "account_user_quota_shares"
+	// UserQuotaSharesInverseTable is the table name for the AccountUserQuotaShare entity.
+	// It exists in this package in order to avoid circular dependency with the "accountuserquotashare" package.
+	UserQuotaSharesInverseTable = "account_user_quota_shares"
+	// UserQuotaSharesColumn is the table column denoting the user_quota_shares relation/edge.
+	UserQuotaSharesColumn = "account_id"
+	// QuotaShareUsagesTable is the table that holds the quota_share_usages relation/edge.
+	QuotaShareUsagesTable = "account_quota_share_usages"
+	// QuotaShareUsagesInverseTable is the table name for the AccountQuotaShareUsage entity.
+	// It exists in this package in order to avoid circular dependency with the "accountquotashareusage" package.
+	QuotaShareUsagesInverseTable = "account_quota_share_usages"
+	// QuotaShareUsagesColumn is the table column denoting the quota_share_usages relation/edge.
+	QuotaShareUsagesColumn = "account_id"
+	// UserQuotaShareUsagesTable is the table that holds the user_quota_share_usages relation/edge.
+	UserQuotaShareUsagesTable = "account_user_quota_share_usages"
+	// UserQuotaShareUsagesInverseTable is the table name for the AccountUserQuotaShareUsage entity.
+	// It exists in this package in order to avoid circular dependency with the "accountuserquotashareusage" package.
+	UserQuotaShareUsagesInverseTable = "account_user_quota_share_usages"
+	// UserQuotaShareUsagesColumn is the table column denoting the user_quota_share_usages relation/edge.
+	UserQuotaShareUsagesColumn = "account_id"
 	// AccountGroupsTable is the table that holds the account_groups relation/edge.
 	AccountGroupsTable = "account_groups"
 	// AccountGroupsInverseTable is the table name for the AccountGroup entity.
@@ -457,6 +484,48 @@ func ByUsageLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByUserQuotaSharesCount orders the results by user_quota_shares count.
+func ByUserQuotaSharesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newUserQuotaSharesStep(), opts...)
+	}
+}
+
+// ByUserQuotaShares orders the results by user_quota_shares terms.
+func ByUserQuotaShares(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newUserQuotaSharesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByQuotaShareUsagesCount orders the results by quota_share_usages count.
+func ByQuotaShareUsagesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newQuotaShareUsagesStep(), opts...)
+	}
+}
+
+// ByQuotaShareUsages orders the results by quota_share_usages terms.
+func ByQuotaShareUsages(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newQuotaShareUsagesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByUserQuotaShareUsagesCount orders the results by user_quota_share_usages count.
+func ByUserQuotaShareUsagesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newUserQuotaShareUsagesStep(), opts...)
+	}
+}
+
+// ByUserQuotaShareUsages orders the results by user_quota_share_usages terms.
+func ByUserQuotaShareUsages(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newUserQuotaShareUsagesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByAccountGroupsCount orders the results by account_groups count.
 func ByAccountGroupsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -503,6 +572,27 @@ func newUsageLogsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UsageLogsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, UsageLogsTable, UsageLogsColumn),
+	)
+}
+func newUserQuotaSharesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(UserQuotaSharesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, UserQuotaSharesTable, UserQuotaSharesColumn),
+	)
+}
+func newQuotaShareUsagesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(QuotaShareUsagesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, QuotaShareUsagesTable, QuotaShareUsagesColumn),
+	)
+}
+func newUserQuotaShareUsagesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(UserQuotaShareUsagesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, UserQuotaShareUsagesTable, UserQuotaShareUsagesColumn),
 	)
 }
 func newAccountGroupsStep() *sqlgraph.Step {

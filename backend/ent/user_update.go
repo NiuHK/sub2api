@@ -11,6 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashare"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashareusage"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
@@ -641,6 +643,36 @@ func (_u *UserUpdate) AddPlatformQuotas(v ...*UserPlatformQuota) *UserUpdate {
 	return _u.AddPlatformQuotaIDs(ids...)
 }
 
+// AddAccountQuotaShareIDs adds the "account_quota_shares" edge to the AccountUserQuotaShare entity by IDs.
+func (_u *UserUpdate) AddAccountQuotaShareIDs(ids ...int64) *UserUpdate {
+	_u.mutation.AddAccountQuotaShareIDs(ids...)
+	return _u
+}
+
+// AddAccountQuotaShares adds the "account_quota_shares" edges to the AccountUserQuotaShare entity.
+func (_u *UserUpdate) AddAccountQuotaShares(v ...*AccountUserQuotaShare) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddAccountQuotaShareIDs(ids...)
+}
+
+// AddQuotaShareUsageIDs adds the "quota_share_usages" edge to the AccountUserQuotaShareUsage entity by IDs.
+func (_u *UserUpdate) AddQuotaShareUsageIDs(ids ...int64) *UserUpdate {
+	_u.mutation.AddQuotaShareUsageIDs(ids...)
+	return _u
+}
+
+// AddQuotaShareUsages adds the "quota_share_usages" edges to the AccountUserQuotaShareUsage entity.
+func (_u *UserUpdate) AddQuotaShareUsages(v ...*AccountUserQuotaShareUsage) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddQuotaShareUsageIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdate) Mutation() *UserMutation {
 	return _u.mutation
@@ -917,6 +949,48 @@ func (_u *UserUpdate) RemovePlatformQuotas(v ...*UserPlatformQuota) *UserUpdate 
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePlatformQuotaIDs(ids...)
+}
+
+// ClearAccountQuotaShares clears all "account_quota_shares" edges to the AccountUserQuotaShare entity.
+func (_u *UserUpdate) ClearAccountQuotaShares() *UserUpdate {
+	_u.mutation.ClearAccountQuotaShares()
+	return _u
+}
+
+// RemoveAccountQuotaShareIDs removes the "account_quota_shares" edge to AccountUserQuotaShare entities by IDs.
+func (_u *UserUpdate) RemoveAccountQuotaShareIDs(ids ...int64) *UserUpdate {
+	_u.mutation.RemoveAccountQuotaShareIDs(ids...)
+	return _u
+}
+
+// RemoveAccountQuotaShares removes "account_quota_shares" edges to AccountUserQuotaShare entities.
+func (_u *UserUpdate) RemoveAccountQuotaShares(v ...*AccountUserQuotaShare) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveAccountQuotaShareIDs(ids...)
+}
+
+// ClearQuotaShareUsages clears all "quota_share_usages" edges to the AccountUserQuotaShareUsage entity.
+func (_u *UserUpdate) ClearQuotaShareUsages() *UserUpdate {
+	_u.mutation.ClearQuotaShareUsages()
+	return _u
+}
+
+// RemoveQuotaShareUsageIDs removes the "quota_share_usages" edge to AccountUserQuotaShareUsage entities by IDs.
+func (_u *UserUpdate) RemoveQuotaShareUsageIDs(ids ...int64) *UserUpdate {
+	_u.mutation.RemoveQuotaShareUsageIDs(ids...)
+	return _u
+}
+
+// RemoveQuotaShareUsages removes "quota_share_usages" edges to AccountUserQuotaShareUsage entities.
+func (_u *UserUpdate) RemoveQuotaShareUsages(v ...*AccountUserQuotaShareUsage) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveQuotaShareUsageIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -1713,6 +1787,96 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.AccountQuotaSharesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.AccountQuotaSharesTable,
+			Columns: []string{user.AccountQuotaSharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashare.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedAccountQuotaSharesIDs(); len(nodes) > 0 && !_u.mutation.AccountQuotaSharesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.AccountQuotaSharesTable,
+			Columns: []string{user.AccountQuotaSharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashare.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.AccountQuotaSharesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.AccountQuotaSharesTable,
+			Columns: []string{user.AccountQuotaSharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashare.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.QuotaShareUsagesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.QuotaShareUsagesTable,
+			Columns: []string{user.QuotaShareUsagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashareusage.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedQuotaShareUsagesIDs(); len(nodes) > 0 && !_u.mutation.QuotaShareUsagesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.QuotaShareUsagesTable,
+			Columns: []string{user.QuotaShareUsagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashareusage.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QuotaShareUsagesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.QuotaShareUsagesTable,
+			Columns: []string{user.QuotaShareUsagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashareusage.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{user.Label}
@@ -2334,6 +2498,36 @@ func (_u *UserUpdateOne) AddPlatformQuotas(v ...*UserPlatformQuota) *UserUpdateO
 	return _u.AddPlatformQuotaIDs(ids...)
 }
 
+// AddAccountQuotaShareIDs adds the "account_quota_shares" edge to the AccountUserQuotaShare entity by IDs.
+func (_u *UserUpdateOne) AddAccountQuotaShareIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.AddAccountQuotaShareIDs(ids...)
+	return _u
+}
+
+// AddAccountQuotaShares adds the "account_quota_shares" edges to the AccountUserQuotaShare entity.
+func (_u *UserUpdateOne) AddAccountQuotaShares(v ...*AccountUserQuotaShare) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddAccountQuotaShareIDs(ids...)
+}
+
+// AddQuotaShareUsageIDs adds the "quota_share_usages" edge to the AccountUserQuotaShareUsage entity by IDs.
+func (_u *UserUpdateOne) AddQuotaShareUsageIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.AddQuotaShareUsageIDs(ids...)
+	return _u
+}
+
+// AddQuotaShareUsages adds the "quota_share_usages" edges to the AccountUserQuotaShareUsage entity.
+func (_u *UserUpdateOne) AddQuotaShareUsages(v ...*AccountUserQuotaShareUsage) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddQuotaShareUsageIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdateOne) Mutation() *UserMutation {
 	return _u.mutation
@@ -2610,6 +2804,48 @@ func (_u *UserUpdateOne) RemovePlatformQuotas(v ...*UserPlatformQuota) *UserUpda
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePlatformQuotaIDs(ids...)
+}
+
+// ClearAccountQuotaShares clears all "account_quota_shares" edges to the AccountUserQuotaShare entity.
+func (_u *UserUpdateOne) ClearAccountQuotaShares() *UserUpdateOne {
+	_u.mutation.ClearAccountQuotaShares()
+	return _u
+}
+
+// RemoveAccountQuotaShareIDs removes the "account_quota_shares" edge to AccountUserQuotaShare entities by IDs.
+func (_u *UserUpdateOne) RemoveAccountQuotaShareIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.RemoveAccountQuotaShareIDs(ids...)
+	return _u
+}
+
+// RemoveAccountQuotaShares removes "account_quota_shares" edges to AccountUserQuotaShare entities.
+func (_u *UserUpdateOne) RemoveAccountQuotaShares(v ...*AccountUserQuotaShare) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveAccountQuotaShareIDs(ids...)
+}
+
+// ClearQuotaShareUsages clears all "quota_share_usages" edges to the AccountUserQuotaShareUsage entity.
+func (_u *UserUpdateOne) ClearQuotaShareUsages() *UserUpdateOne {
+	_u.mutation.ClearQuotaShareUsages()
+	return _u
+}
+
+// RemoveQuotaShareUsageIDs removes the "quota_share_usages" edge to AccountUserQuotaShareUsage entities by IDs.
+func (_u *UserUpdateOne) RemoveQuotaShareUsageIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.RemoveQuotaShareUsageIDs(ids...)
+	return _u
+}
+
+// RemoveQuotaShareUsages removes "quota_share_usages" edges to AccountUserQuotaShareUsage entities.
+func (_u *UserUpdateOne) RemoveQuotaShareUsages(v ...*AccountUserQuotaShareUsage) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveQuotaShareUsageIDs(ids...)
 }
 
 // Where appends a list predicates to the UserUpdate builder.
@@ -3429,6 +3665,96 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(userplatformquota.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.AccountQuotaSharesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.AccountQuotaSharesTable,
+			Columns: []string{user.AccountQuotaSharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashare.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedAccountQuotaSharesIDs(); len(nodes) > 0 && !_u.mutation.AccountQuotaSharesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.AccountQuotaSharesTable,
+			Columns: []string{user.AccountQuotaSharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashare.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.AccountQuotaSharesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.AccountQuotaSharesTable,
+			Columns: []string{user.AccountQuotaSharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashare.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.QuotaShareUsagesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.QuotaShareUsagesTable,
+			Columns: []string{user.QuotaShareUsagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashareusage.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedQuotaShareUsagesIDs(); len(nodes) > 0 && !_u.mutation.QuotaShareUsagesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.QuotaShareUsagesTable,
+			Columns: []string{user.QuotaShareUsagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashareusage.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QuotaShareUsagesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.QuotaShareUsagesTable,
+			Columns: []string{user.QuotaShareUsagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashareusage.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

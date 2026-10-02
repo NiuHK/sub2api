@@ -20,6 +20,12 @@ type Tx struct {
 	Account *AccountClient
 	// AccountGroup is the client for interacting with the AccountGroup builders.
 	AccountGroup *AccountGroupClient
+	// AccountQuotaShareUsage is the client for interacting with the AccountQuotaShareUsage builders.
+	AccountQuotaShareUsage *AccountQuotaShareUsageClient
+	// AccountUserQuotaShare is the client for interacting with the AccountUserQuotaShare builders.
+	AccountUserQuotaShare *AccountUserQuotaShareClient
+	// AccountUserQuotaShareUsage is the client for interacting with the AccountUserQuotaShareUsage builders.
+	AccountUserQuotaShareUsage *AccountUserQuotaShareUsageClient
 	// Announcement is the client for interacting with the Announcement builders.
 	Announcement *AnnouncementClient
 	// AnnouncementRead is the client for interacting with the AnnouncementRead builders.
@@ -226,6 +232,9 @@ func (tx *Tx) init() {
 	tx.APIKey = NewAPIKeyClient(tx.config)
 	tx.Account = NewAccountClient(tx.config)
 	tx.AccountGroup = NewAccountGroupClient(tx.config)
+	tx.AccountQuotaShareUsage = NewAccountQuotaShareUsageClient(tx.config)
+	tx.AccountUserQuotaShare = NewAccountUserQuotaShareClient(tx.config)
+	tx.AccountUserQuotaShareUsage = NewAccountUserQuotaShareUsageClient(tx.config)
 	tx.Announcement = NewAnnouncementClient(tx.config)
 	tx.AnnouncementRead = NewAnnouncementReadClient(tx.config)
 	tx.AuthIdentity = NewAuthIdentityClient(tx.config)

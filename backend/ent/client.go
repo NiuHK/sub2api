@@ -17,6 +17,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/accountquotashareusage"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashare"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashareusage"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -69,6 +72,12 @@ type Client struct {
 	Account *AccountClient
 	// AccountGroup is the client for interacting with the AccountGroup builders.
 	AccountGroup *AccountGroupClient
+	// AccountQuotaShareUsage is the client for interacting with the AccountQuotaShareUsage builders.
+	AccountQuotaShareUsage *AccountQuotaShareUsageClient
+	// AccountUserQuotaShare is the client for interacting with the AccountUserQuotaShare builders.
+	AccountUserQuotaShare *AccountUserQuotaShareClient
+	// AccountUserQuotaShareUsage is the client for interacting with the AccountUserQuotaShareUsage builders.
+	AccountUserQuotaShareUsage *AccountUserQuotaShareUsageClient
 	// Announcement is the client for interacting with the Announcement builders.
 	Announcement *AnnouncementClient
 	// AnnouncementRead is the client for interacting with the AnnouncementRead builders.
@@ -155,6 +164,9 @@ func (c *Client) init() {
 	c.APIKey = NewAPIKeyClient(c.config)
 	c.Account = NewAccountClient(c.config)
 	c.AccountGroup = NewAccountGroupClient(c.config)
+	c.AccountQuotaShareUsage = NewAccountQuotaShareUsageClient(c.config)
+	c.AccountUserQuotaShare = NewAccountUserQuotaShareClient(c.config)
+	c.AccountUserQuotaShareUsage = NewAccountUserQuotaShareUsageClient(c.config)
 	c.Announcement = NewAnnouncementClient(c.config)
 	c.AnnouncementRead = NewAnnouncementReadClient(c.config)
 	c.AuthIdentity = NewAuthIdentityClient(c.config)
@@ -286,6 +298,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		APIKey:                        NewAPIKeyClient(cfg),
 		Account:                       NewAccountClient(cfg),
 		AccountGroup:                  NewAccountGroupClient(cfg),
+		AccountQuotaShareUsage:        NewAccountQuotaShareUsageClient(cfg),
+		AccountUserQuotaShare:         NewAccountUserQuotaShareClient(cfg),
+		AccountUserQuotaShareUsage:    NewAccountUserQuotaShareUsageClient(cfg),
 		Announcement:                  NewAnnouncementClient(cfg),
 		AnnouncementRead:              NewAnnouncementReadClient(cfg),
 		AuthIdentity:                  NewAuthIdentityClient(cfg),
@@ -344,6 +359,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		APIKey:                        NewAPIKeyClient(cfg),
 		Account:                       NewAccountClient(cfg),
 		AccountGroup:                  NewAccountGroupClient(cfg),
+		AccountQuotaShareUsage:        NewAccountQuotaShareUsageClient(cfg),
+		AccountUserQuotaShare:         NewAccountUserQuotaShareClient(cfg),
+		AccountUserQuotaShareUsage:    NewAccountUserQuotaShareUsageClient(cfg),
 		Announcement:                  NewAnnouncementClient(cfg),
 		AnnouncementRead:              NewAnnouncementReadClient(cfg),
 		AuthIdentity:                  NewAuthIdentityClient(cfg),
@@ -409,16 +427,17 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.APIKey, c.Account, c.AccountGroup, c.AccountQuotaShareUsage,
+		c.AccountUserQuotaShare, c.AccountUserQuotaShareUsage, c.Announcement,
+		c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent,
+		c.BatchImageItem, c.BatchImageJob, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.ErrorPassthroughRule,
+		c.Group, c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -429,16 +448,17 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.APIKey, c.Account, c.AccountGroup, c.AccountQuotaShareUsage,
+		c.AccountUserQuotaShare, c.AccountUserQuotaShareUsage, c.Announcement,
+		c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent,
+		c.BatchImageItem, c.BatchImageJob, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.ErrorPassthroughRule,
+		c.Group, c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -454,6 +474,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Account.mutate(ctx, m)
 	case *AccountGroupMutation:
 		return c.AccountGroup.mutate(ctx, m)
+	case *AccountQuotaShareUsageMutation:
+		return c.AccountQuotaShareUsage.mutate(ctx, m)
+	case *AccountUserQuotaShareMutation:
+		return c.AccountUserQuotaShare.mutate(ctx, m)
+	case *AccountUserQuotaShareUsageMutation:
+		return c.AccountUserQuotaShareUsage.mutate(ctx, m)
 	case *AnnouncementMutation:
 		return c.Announcement.mutate(ctx, m)
 	case *AnnouncementReadMutation:
@@ -902,6 +928,54 @@ func (c *AccountClient) QueryUsageLogs(_m *Account) *UsageLogQuery {
 	return query
 }
 
+// QueryUserQuotaShares queries the user_quota_shares edge of a Account.
+func (c *AccountClient) QueryUserQuotaShares(_m *Account) *AccountUserQuotaShareQuery {
+	query := (&AccountUserQuotaShareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, id),
+			sqlgraph.To(accountuserquotashare.Table, accountuserquotashare.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.UserQuotaSharesTable, account.UserQuotaSharesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryQuotaShareUsages queries the quota_share_usages edge of a Account.
+func (c *AccountClient) QueryQuotaShareUsages(_m *Account) *AccountQuotaShareUsageQuery {
+	query := (&AccountQuotaShareUsageClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, id),
+			sqlgraph.To(accountquotashareusage.Table, accountquotashareusage.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.QuotaShareUsagesTable, account.QuotaShareUsagesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUserQuotaShareUsages queries the user_quota_share_usages edge of a Account.
+func (c *AccountClient) QueryUserQuotaShareUsages(_m *Account) *AccountUserQuotaShareUsageQuery {
+	query := (&AccountUserQuotaShareUsageClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, id),
+			sqlgraph.To(accountuserquotashareusage.Table, accountuserquotashareusage.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.UserQuotaShareUsagesTable, account.UserQuotaShareUsagesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryAccountGroups queries the account_groups edge of a Account.
 func (c *AccountClient) QueryAccountGroups(_m *Account) *AccountGroupQuery {
 	query := (&AccountGroupClient{config: c.config}).Query()
@@ -1058,6 +1132,487 @@ func (c *AccountGroupClient) mutate(ctx context.Context, m *AccountGroupMutation
 		return (&AccountGroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AccountGroup mutation op: %q", m.Op())
+	}
+}
+
+// AccountQuotaShareUsageClient is a client for the AccountQuotaShareUsage schema.
+type AccountQuotaShareUsageClient struct {
+	config
+}
+
+// NewAccountQuotaShareUsageClient returns a client for the AccountQuotaShareUsage from the given config.
+func NewAccountQuotaShareUsageClient(c config) *AccountQuotaShareUsageClient {
+	return &AccountQuotaShareUsageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `accountquotashareusage.Hooks(f(g(h())))`.
+func (c *AccountQuotaShareUsageClient) Use(hooks ...Hook) {
+	c.hooks.AccountQuotaShareUsage = append(c.hooks.AccountQuotaShareUsage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `accountquotashareusage.Intercept(f(g(h())))`.
+func (c *AccountQuotaShareUsageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AccountQuotaShareUsage = append(c.inters.AccountQuotaShareUsage, interceptors...)
+}
+
+// Create returns a builder for creating a AccountQuotaShareUsage entity.
+func (c *AccountQuotaShareUsageClient) Create() *AccountQuotaShareUsageCreate {
+	mutation := newAccountQuotaShareUsageMutation(c.config, OpCreate)
+	return &AccountQuotaShareUsageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AccountQuotaShareUsage entities.
+func (c *AccountQuotaShareUsageClient) CreateBulk(builders ...*AccountQuotaShareUsageCreate) *AccountQuotaShareUsageCreateBulk {
+	return &AccountQuotaShareUsageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AccountQuotaShareUsageClient) MapCreateBulk(slice any, setFunc func(*AccountQuotaShareUsageCreate, int)) *AccountQuotaShareUsageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AccountQuotaShareUsageCreateBulk{err: fmt.Errorf("calling to AccountQuotaShareUsageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AccountQuotaShareUsageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AccountQuotaShareUsageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AccountQuotaShareUsage.
+func (c *AccountQuotaShareUsageClient) Update() *AccountQuotaShareUsageUpdate {
+	mutation := newAccountQuotaShareUsageMutation(c.config, OpUpdate)
+	return &AccountQuotaShareUsageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AccountQuotaShareUsageClient) UpdateOne(_m *AccountQuotaShareUsage) *AccountQuotaShareUsageUpdateOne {
+	mutation := newAccountQuotaShareUsageMutation(c.config, OpUpdateOne, withAccountQuotaShareUsage(_m))
+	return &AccountQuotaShareUsageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AccountQuotaShareUsageClient) UpdateOneID(id int64) *AccountQuotaShareUsageUpdateOne {
+	mutation := newAccountQuotaShareUsageMutation(c.config, OpUpdateOne, withAccountQuotaShareUsageID(id))
+	return &AccountQuotaShareUsageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AccountQuotaShareUsage.
+func (c *AccountQuotaShareUsageClient) Delete() *AccountQuotaShareUsageDelete {
+	mutation := newAccountQuotaShareUsageMutation(c.config, OpDelete)
+	return &AccountQuotaShareUsageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AccountQuotaShareUsageClient) DeleteOne(_m *AccountQuotaShareUsage) *AccountQuotaShareUsageDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AccountQuotaShareUsageClient) DeleteOneID(id int64) *AccountQuotaShareUsageDeleteOne {
+	builder := c.Delete().Where(accountquotashareusage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AccountQuotaShareUsageDeleteOne{builder}
+}
+
+// Query returns a query builder for AccountQuotaShareUsage.
+func (c *AccountQuotaShareUsageClient) Query() *AccountQuotaShareUsageQuery {
+	return &AccountQuotaShareUsageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAccountQuotaShareUsage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AccountQuotaShareUsage entity by its id.
+func (c *AccountQuotaShareUsageClient) Get(ctx context.Context, id int64) (*AccountQuotaShareUsage, error) {
+	return c.Query().Where(accountquotashareusage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AccountQuotaShareUsageClient) GetX(ctx context.Context, id int64) *AccountQuotaShareUsage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryAccount queries the account edge of a AccountQuotaShareUsage.
+func (c *AccountQuotaShareUsageClient) QueryAccount(_m *AccountQuotaShareUsage) *AccountQuery {
+	query := (&AccountClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(accountquotashareusage.Table, accountquotashareusage.FieldID, id),
+			sqlgraph.To(account.Table, account.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, accountquotashareusage.AccountTable, accountquotashareusage.AccountColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *AccountQuotaShareUsageClient) Hooks() []Hook {
+	return c.hooks.AccountQuotaShareUsage
+}
+
+// Interceptors returns the client interceptors.
+func (c *AccountQuotaShareUsageClient) Interceptors() []Interceptor {
+	return c.inters.AccountQuotaShareUsage
+}
+
+func (c *AccountQuotaShareUsageClient) mutate(ctx context.Context, m *AccountQuotaShareUsageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AccountQuotaShareUsageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AccountQuotaShareUsageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AccountQuotaShareUsageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AccountQuotaShareUsageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AccountQuotaShareUsage mutation op: %q", m.Op())
+	}
+}
+
+// AccountUserQuotaShareClient is a client for the AccountUserQuotaShare schema.
+type AccountUserQuotaShareClient struct {
+	config
+}
+
+// NewAccountUserQuotaShareClient returns a client for the AccountUserQuotaShare from the given config.
+func NewAccountUserQuotaShareClient(c config) *AccountUserQuotaShareClient {
+	return &AccountUserQuotaShareClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `accountuserquotashare.Hooks(f(g(h())))`.
+func (c *AccountUserQuotaShareClient) Use(hooks ...Hook) {
+	c.hooks.AccountUserQuotaShare = append(c.hooks.AccountUserQuotaShare, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `accountuserquotashare.Intercept(f(g(h())))`.
+func (c *AccountUserQuotaShareClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AccountUserQuotaShare = append(c.inters.AccountUserQuotaShare, interceptors...)
+}
+
+// Create returns a builder for creating a AccountUserQuotaShare entity.
+func (c *AccountUserQuotaShareClient) Create() *AccountUserQuotaShareCreate {
+	mutation := newAccountUserQuotaShareMutation(c.config, OpCreate)
+	return &AccountUserQuotaShareCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AccountUserQuotaShare entities.
+func (c *AccountUserQuotaShareClient) CreateBulk(builders ...*AccountUserQuotaShareCreate) *AccountUserQuotaShareCreateBulk {
+	return &AccountUserQuotaShareCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AccountUserQuotaShareClient) MapCreateBulk(slice any, setFunc func(*AccountUserQuotaShareCreate, int)) *AccountUserQuotaShareCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AccountUserQuotaShareCreateBulk{err: fmt.Errorf("calling to AccountUserQuotaShareClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AccountUserQuotaShareCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AccountUserQuotaShareCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AccountUserQuotaShare.
+func (c *AccountUserQuotaShareClient) Update() *AccountUserQuotaShareUpdate {
+	mutation := newAccountUserQuotaShareMutation(c.config, OpUpdate)
+	return &AccountUserQuotaShareUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AccountUserQuotaShareClient) UpdateOne(_m *AccountUserQuotaShare) *AccountUserQuotaShareUpdateOne {
+	mutation := newAccountUserQuotaShareMutation(c.config, OpUpdateOne, withAccountUserQuotaShare(_m))
+	return &AccountUserQuotaShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AccountUserQuotaShareClient) UpdateOneID(id int64) *AccountUserQuotaShareUpdateOne {
+	mutation := newAccountUserQuotaShareMutation(c.config, OpUpdateOne, withAccountUserQuotaShareID(id))
+	return &AccountUserQuotaShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AccountUserQuotaShare.
+func (c *AccountUserQuotaShareClient) Delete() *AccountUserQuotaShareDelete {
+	mutation := newAccountUserQuotaShareMutation(c.config, OpDelete)
+	return &AccountUserQuotaShareDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AccountUserQuotaShareClient) DeleteOne(_m *AccountUserQuotaShare) *AccountUserQuotaShareDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AccountUserQuotaShareClient) DeleteOneID(id int64) *AccountUserQuotaShareDeleteOne {
+	builder := c.Delete().Where(accountuserquotashare.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AccountUserQuotaShareDeleteOne{builder}
+}
+
+// Query returns a query builder for AccountUserQuotaShare.
+func (c *AccountUserQuotaShareClient) Query() *AccountUserQuotaShareQuery {
+	return &AccountUserQuotaShareQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAccountUserQuotaShare},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AccountUserQuotaShare entity by its id.
+func (c *AccountUserQuotaShareClient) Get(ctx context.Context, id int64) (*AccountUserQuotaShare, error) {
+	return c.Query().Where(accountuserquotashare.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AccountUserQuotaShareClient) GetX(ctx context.Context, id int64) *AccountUserQuotaShare {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryAccount queries the account edge of a AccountUserQuotaShare.
+func (c *AccountUserQuotaShareClient) QueryAccount(_m *AccountUserQuotaShare) *AccountQuery {
+	query := (&AccountClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(accountuserquotashare.Table, accountuserquotashare.FieldID, id),
+			sqlgraph.To(account.Table, account.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, accountuserquotashare.AccountTable, accountuserquotashare.AccountColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUser queries the user edge of a AccountUserQuotaShare.
+func (c *AccountUserQuotaShareClient) QueryUser(_m *AccountUserQuotaShare) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(accountuserquotashare.Table, accountuserquotashare.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, accountuserquotashare.UserTable, accountuserquotashare.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *AccountUserQuotaShareClient) Hooks() []Hook {
+	hooks := c.hooks.AccountUserQuotaShare
+	return append(hooks[:len(hooks):len(hooks)], accountuserquotashare.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *AccountUserQuotaShareClient) Interceptors() []Interceptor {
+	inters := c.inters.AccountUserQuotaShare
+	return append(inters[:len(inters):len(inters)], accountuserquotashare.Interceptors[:]...)
+}
+
+func (c *AccountUserQuotaShareClient) mutate(ctx context.Context, m *AccountUserQuotaShareMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AccountUserQuotaShareCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AccountUserQuotaShareUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AccountUserQuotaShareUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AccountUserQuotaShareDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AccountUserQuotaShare mutation op: %q", m.Op())
+	}
+}
+
+// AccountUserQuotaShareUsageClient is a client for the AccountUserQuotaShareUsage schema.
+type AccountUserQuotaShareUsageClient struct {
+	config
+}
+
+// NewAccountUserQuotaShareUsageClient returns a client for the AccountUserQuotaShareUsage from the given config.
+func NewAccountUserQuotaShareUsageClient(c config) *AccountUserQuotaShareUsageClient {
+	return &AccountUserQuotaShareUsageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `accountuserquotashareusage.Hooks(f(g(h())))`.
+func (c *AccountUserQuotaShareUsageClient) Use(hooks ...Hook) {
+	c.hooks.AccountUserQuotaShareUsage = append(c.hooks.AccountUserQuotaShareUsage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `accountuserquotashareusage.Intercept(f(g(h())))`.
+func (c *AccountUserQuotaShareUsageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AccountUserQuotaShareUsage = append(c.inters.AccountUserQuotaShareUsage, interceptors...)
+}
+
+// Create returns a builder for creating a AccountUserQuotaShareUsage entity.
+func (c *AccountUserQuotaShareUsageClient) Create() *AccountUserQuotaShareUsageCreate {
+	mutation := newAccountUserQuotaShareUsageMutation(c.config, OpCreate)
+	return &AccountUserQuotaShareUsageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AccountUserQuotaShareUsage entities.
+func (c *AccountUserQuotaShareUsageClient) CreateBulk(builders ...*AccountUserQuotaShareUsageCreate) *AccountUserQuotaShareUsageCreateBulk {
+	return &AccountUserQuotaShareUsageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AccountUserQuotaShareUsageClient) MapCreateBulk(slice any, setFunc func(*AccountUserQuotaShareUsageCreate, int)) *AccountUserQuotaShareUsageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AccountUserQuotaShareUsageCreateBulk{err: fmt.Errorf("calling to AccountUserQuotaShareUsageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AccountUserQuotaShareUsageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AccountUserQuotaShareUsageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AccountUserQuotaShareUsage.
+func (c *AccountUserQuotaShareUsageClient) Update() *AccountUserQuotaShareUsageUpdate {
+	mutation := newAccountUserQuotaShareUsageMutation(c.config, OpUpdate)
+	return &AccountUserQuotaShareUsageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AccountUserQuotaShareUsageClient) UpdateOne(_m *AccountUserQuotaShareUsage) *AccountUserQuotaShareUsageUpdateOne {
+	mutation := newAccountUserQuotaShareUsageMutation(c.config, OpUpdateOne, withAccountUserQuotaShareUsage(_m))
+	return &AccountUserQuotaShareUsageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AccountUserQuotaShareUsageClient) UpdateOneID(id int64) *AccountUserQuotaShareUsageUpdateOne {
+	mutation := newAccountUserQuotaShareUsageMutation(c.config, OpUpdateOne, withAccountUserQuotaShareUsageID(id))
+	return &AccountUserQuotaShareUsageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AccountUserQuotaShareUsage.
+func (c *AccountUserQuotaShareUsageClient) Delete() *AccountUserQuotaShareUsageDelete {
+	mutation := newAccountUserQuotaShareUsageMutation(c.config, OpDelete)
+	return &AccountUserQuotaShareUsageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AccountUserQuotaShareUsageClient) DeleteOne(_m *AccountUserQuotaShareUsage) *AccountUserQuotaShareUsageDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AccountUserQuotaShareUsageClient) DeleteOneID(id int64) *AccountUserQuotaShareUsageDeleteOne {
+	builder := c.Delete().Where(accountuserquotashareusage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AccountUserQuotaShareUsageDeleteOne{builder}
+}
+
+// Query returns a query builder for AccountUserQuotaShareUsage.
+func (c *AccountUserQuotaShareUsageClient) Query() *AccountUserQuotaShareUsageQuery {
+	return &AccountUserQuotaShareUsageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAccountUserQuotaShareUsage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AccountUserQuotaShareUsage entity by its id.
+func (c *AccountUserQuotaShareUsageClient) Get(ctx context.Context, id int64) (*AccountUserQuotaShareUsage, error) {
+	return c.Query().Where(accountuserquotashareusage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AccountUserQuotaShareUsageClient) GetX(ctx context.Context, id int64) *AccountUserQuotaShareUsage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryAccount queries the account edge of a AccountUserQuotaShareUsage.
+func (c *AccountUserQuotaShareUsageClient) QueryAccount(_m *AccountUserQuotaShareUsage) *AccountQuery {
+	query := (&AccountClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(accountuserquotashareusage.Table, accountuserquotashareusage.FieldID, id),
+			sqlgraph.To(account.Table, account.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, accountuserquotashareusage.AccountTable, accountuserquotashareusage.AccountColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUser queries the user edge of a AccountUserQuotaShareUsage.
+func (c *AccountUserQuotaShareUsageClient) QueryUser(_m *AccountUserQuotaShareUsage) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(accountuserquotashareusage.Table, accountuserquotashareusage.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, accountuserquotashareusage.UserTable, accountuserquotashareusage.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *AccountUserQuotaShareUsageClient) Hooks() []Hook {
+	return c.hooks.AccountUserQuotaShareUsage
+}
+
+// Interceptors returns the client interceptors.
+func (c *AccountUserQuotaShareUsageClient) Interceptors() []Interceptor {
+	return c.inters.AccountUserQuotaShareUsage
+}
+
+func (c *AccountUserQuotaShareUsageClient) mutate(ctx context.Context, m *AccountUserQuotaShareUsageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AccountUserQuotaShareUsageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AccountUserQuotaShareUsageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AccountUserQuotaShareUsageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AccountUserQuotaShareUsageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AccountUserQuotaShareUsage mutation op: %q", m.Op())
 	}
 }
 
@@ -6013,6 +6568,38 @@ func (c *UserClient) QueryPlatformQuotas(_m *User) *UserPlatformQuotaQuery {
 	return query
 }
 
+// QueryAccountQuotaShares queries the account_quota_shares edge of a User.
+func (c *UserClient) QueryAccountQuotaShares(_m *User) *AccountUserQuotaShareQuery {
+	query := (&AccountUserQuotaShareClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(accountuserquotashare.Table, accountuserquotashare.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.AccountQuotaSharesTable, user.AccountQuotaSharesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryQuotaShareUsages queries the quota_share_usages edge of a User.
+func (c *UserClient) QueryQuotaShareUsages(_m *User) *AccountUserQuotaShareUsageQuery {
+	query := (&AccountUserQuotaShareUsageClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(accountuserquotashareusage.Table, accountuserquotashareusage.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.QuotaShareUsagesTable, user.QuotaShareUsagesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryUserAllowedGroups queries the user_allowed_groups edge of a User.
 func (c *UserClient) QueryUserAllowedGroups(_m *User) *UserAllowedGroupQuery {
 	query := (&UserAllowedGroupClient{config: c.config}).Query()
@@ -6841,7 +7428,8 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
+		APIKey, Account, AccountGroup, AccountQuotaShareUsage, AccountUserQuotaShare,
+		AccountUserQuotaShareUsage, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
 		ChannelMonitorRequestTemplate, CompositeModelRoute, ErrorPassthroughRule,
@@ -6853,7 +7441,8 @@ type (
 		UserSubscription []ent.Hook
 	}
 	inters struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
+		APIKey, Account, AccountGroup, AccountQuotaShareUsage, AccountUserQuotaShare,
+		AccountUserQuotaShareUsage, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
 		ChannelMonitorRequestTemplate, CompositeModelRoute, ErrorPassthroughRule,
