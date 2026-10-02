@@ -1131,6 +1131,23 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	}
 
 	cfg := s.schedulingConfig()
+	quotaUserID := accountQuotaShareUserIDFromContext(ctx)
+	quotaShareBlocked := false
+	quotaEligible := func(account *Account) bool {
+		if quotaUserID <= 0 || s.accountUserQuotaShareService == nil || account == nil || !account.IsOpenAIOAuth() {
+			return true
+		}
+		decision, evalErr := s.accountUserQuotaShareService.Evaluate(ctx, account, quotaUserID)
+		// Keep the existing fail-open behavior for a temporary quota snapshot
+		// read error; a successful decision is authoritative.
+		if evalErr != nil {
+			return true
+		}
+		if !decision.Eligible {
+			quotaShareBlocked = true
+		}
+		return decision.Eligible
+	}
 	preferLowUpstreamRate := useUpstreamTokenCost && s.isOpenAILowUpstreamRatePriorityEnabled(ctx)
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	var stickyAccountID int64
@@ -1140,9 +1157,29 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		}
 	}
 	if s.concurrencyService == nil || !cfg.LoadBatchEnabled {
-		account, stickyHit, err := s.selectAccountForModelWithExclusionsStickyHit(ctx, groupID, platform, sessionHash, requestedModel, excludedIDs, requireCompact, stickyAccountID, requiredCapability, preferLowUpstreamRate)
-		if err != nil {
-			return nil, err
+		effectiveExcludedIDs := cloneExcludedAccountIDs(excludedIDs)
+		var account *Account
+		var stickyHit bool
+		for {
+			var err error
+			account, stickyHit, err = s.selectAccountForModelWithExclusionsStickyHit(ctx, groupID, platform, sessionHash, requestedModel, effectiveExcludedIDs, requireCompact, stickyAccountID, requiredCapability, preferLowUpstreamRate)
+			if err != nil {
+				if quotaShareBlocked {
+					return nil, ErrAccountUserQuotaShareExhausted
+				}
+				return nil, err
+			}
+			if account == nil {
+				return nil, ErrNoAvailableAccounts
+			}
+			if quotaEligible(account) {
+				break
+			}
+			if effectiveExcludedIDs == nil {
+				effectiveExcludedIDs = make(map[int64]struct{})
+			}
+			effectiveExcludedIDs[account.ID] = struct{}{}
+			stickyAccountID = 0
 		}
 		result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
 		if err == nil && result != nil && result.Acquired {
@@ -1201,7 +1238,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				if clearSticky {
 					_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 				}
-				if !clearSticky && isOpenAICompatibleAccountEligibleForRequest(ctx, account, platform, requestedModel, false, requiredCapability) {
+				if !clearSticky && isOpenAICompatibleAccountEligibleForRequest(ctx, account, platform, requestedModel, false, requiredCapability) && quotaEligible(account) {
 					account = s.recheckSelectedOpenAIAccountFromDB(ctx, account, groupID, platform, requestedModel, requireCompact, requiredCapability)
 					if account == nil {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
@@ -1265,6 +1302,10 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			filterStats.exclude("excluded")
 			continue
 		}
+		if !quotaEligible(acc) {
+			filterStats.exclude("account_user_quota_share")
+			continue
+		}
 		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
 		// re-check schedulability here so recently rate-limited/overloaded accounts
 		// are not selected again before the bucket is rebuilt.
@@ -1289,6 +1330,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	}
 
 	if len(candidates) == 0 {
+		if quotaShareBlocked {
+			return nil, ErrAccountUserQuotaShareExhausted
+		}
 		return nil, noAvailableOpenAISelectionError(requestedModel, false, filterStats.summary(""))
 	}
 	rateOrder := openAILegacyUpstreamRateOrder{}
