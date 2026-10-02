@@ -178,6 +178,26 @@ export async function getById(id: number): Promise<Account> {
   return data
 }
 
+export interface AccountQuotaShare {
+  user_id: number
+  username?: string
+  email?: string
+  five_hour_percent: number
+  seven_day_percent: number
+  five_hour_used_percent?: number | null
+  seven_day_used_percent?: number | null
+}
+
+export async function getQuotaShares(id: number): Promise<{ shares: AccountQuotaShare[] }> {
+  const { data } = await apiClient.get<{ shares: AccountQuotaShare[] }>(`/admin/accounts/${id}/quota-shares`)
+  return data
+}
+
+export async function updateQuotaShares(id: number, shares: AccountQuotaShare[]): Promise<{ shares: AccountQuotaShare[] }> {
+  const { data } = await apiClient.put<{ shares: AccountQuotaShare[] }>(`/admin/accounts/${id}/quota-shares`, { shares })
+  return data
+}
+
 /**
  * Create new account
  * @param accountData - Account data
@@ -1136,6 +1156,8 @@ export const accountsAPI = {
   listWithEtag,
   getUpstreamBillingRatesWithEtag,
   getById,
+  getQuotaShares,
+  updateQuotaShares,
   create,
   duplicate,
   update,

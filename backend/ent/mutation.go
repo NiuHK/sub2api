@@ -14,6 +14,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/accountquotashareusage"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashare"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashareusage"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -67,6 +70,9 @@ const (
 	TypeAPIKey                        = "APIKey"
 	TypeAccount                       = "Account"
 	TypeAccountGroup                  = "AccountGroup"
+	TypeAccountQuotaShareUsage        = "AccountQuotaShareUsage"
+	TypeAccountUserQuotaShare         = "AccountUserQuotaShare"
+	TypeAccountUserQuotaShareUsage    = "AccountUserQuotaShareUsage"
 	TypeAnnouncement                  = "Announcement"
 	TypeAnnouncementRead              = "AnnouncementRead"
 	TypeAuthIdentity                  = "AuthIdentity"
@@ -2406,60 +2412,69 @@ func (m *APIKeyMutation) ResetEdge(name string) error {
 // AccountMutation represents an operation that mutates the Account nodes in the graph.
 type AccountMutation struct {
 	config
-	op                          Op
-	typ                         string
-	id                          *int64
-	created_at                  *time.Time
-	updated_at                  *time.Time
-	deleted_at                  *time.Time
-	name                        *string
-	notes                       *string
-	platform                    *string
-	_type                       *string
-	credentials                 *map[string]interface{}
-	extra                       *map[string]interface{}
-	proxy_fallback_origin_id    *int64
-	addproxy_fallback_origin_id *int64
-	concurrency                 *int
-	addconcurrency              *int
-	load_factor                 *int
-	addload_factor              *int
-	priority                    *int
-	addpriority                 *int
-	rate_multiplier             *float64
-	addrate_multiplier          *float64
-	status                      *string
-	error_message               *string
-	last_used_at                *time.Time
-	expires_at                  *time.Time
-	auto_pause_on_expired       *bool
-	schedulable                 *bool
-	rate_limited_at             *time.Time
-	rate_limit_reset_at         *time.Time
-	overload_until              *time.Time
-	temp_unschedulable_until    *time.Time
-	temp_unschedulable_reason   *string
-	session_window_start        *time.Time
-	session_window_end          *time.Time
-	session_window_status       *string
-	quota_dimension             *account.QuotaDimension
-	clearedFields               map[string]struct{}
-	groups                      map[int64]struct{}
-	removedgroups               map[int64]struct{}
-	clearedgroups               bool
-	proxy                       *int64
-	clearedproxy                bool
-	parent                      *int64
-	clearedparent               bool
-	children                    map[int64]struct{}
-	removedchildren             map[int64]struct{}
-	clearedchildren             bool
-	usage_logs                  map[int64]struct{}
-	removedusage_logs           map[int64]struct{}
-	clearedusage_logs           bool
-	done                        bool
-	oldValue                    func(context.Context) (*Account, error)
-	predicates                  []predicate.Account
+	op                             Op
+	typ                            string
+	id                             *int64
+	created_at                     *time.Time
+	updated_at                     *time.Time
+	deleted_at                     *time.Time
+	name                           *string
+	notes                          *string
+	platform                       *string
+	_type                          *string
+	credentials                    *map[string]interface{}
+	extra                          *map[string]interface{}
+	proxy_fallback_origin_id       *int64
+	addproxy_fallback_origin_id    *int64
+	concurrency                    *int
+	addconcurrency                 *int
+	load_factor                    *int
+	addload_factor                 *int
+	priority                       *int
+	addpriority                    *int
+	rate_multiplier                *float64
+	addrate_multiplier             *float64
+	status                         *string
+	error_message                  *string
+	last_used_at                   *time.Time
+	expires_at                     *time.Time
+	auto_pause_on_expired          *bool
+	schedulable                    *bool
+	rate_limited_at                *time.Time
+	rate_limit_reset_at            *time.Time
+	overload_until                 *time.Time
+	temp_unschedulable_until       *time.Time
+	temp_unschedulable_reason      *string
+	session_window_start           *time.Time
+	session_window_end             *time.Time
+	session_window_status          *string
+	quota_dimension                *account.QuotaDimension
+	clearedFields                  map[string]struct{}
+	groups                         map[int64]struct{}
+	removedgroups                  map[int64]struct{}
+	clearedgroups                  bool
+	proxy                          *int64
+	clearedproxy                   bool
+	parent                         *int64
+	clearedparent                  bool
+	children                       map[int64]struct{}
+	removedchildren                map[int64]struct{}
+	clearedchildren                bool
+	usage_logs                     map[int64]struct{}
+	removedusage_logs              map[int64]struct{}
+	clearedusage_logs              bool
+	user_quota_shares              map[int64]struct{}
+	removeduser_quota_shares       map[int64]struct{}
+	cleareduser_quota_shares       bool
+	quota_share_usages             map[int64]struct{}
+	removedquota_share_usages      map[int64]struct{}
+	clearedquota_share_usages      bool
+	user_quota_share_usages        map[int64]struct{}
+	removeduser_quota_share_usages map[int64]struct{}
+	cleareduser_quota_share_usages bool
+	done                           bool
+	oldValue                       func(context.Context) (*Account, error)
+	predicates                     []predicate.Account
 }
 
 var _ ent.Mutation = (*AccountMutation)(nil)
@@ -4228,6 +4243,168 @@ func (m *AccountMutation) ResetUsageLogs() {
 	m.removedusage_logs = nil
 }
 
+// AddUserQuotaShareIDs adds the "user_quota_shares" edge to the AccountUserQuotaShare entity by ids.
+func (m *AccountMutation) AddUserQuotaShareIDs(ids ...int64) {
+	if m.user_quota_shares == nil {
+		m.user_quota_shares = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.user_quota_shares[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUserQuotaShares clears the "user_quota_shares" edge to the AccountUserQuotaShare entity.
+func (m *AccountMutation) ClearUserQuotaShares() {
+	m.cleareduser_quota_shares = true
+}
+
+// UserQuotaSharesCleared reports if the "user_quota_shares" edge to the AccountUserQuotaShare entity was cleared.
+func (m *AccountMutation) UserQuotaSharesCleared() bool {
+	return m.cleareduser_quota_shares
+}
+
+// RemoveUserQuotaShareIDs removes the "user_quota_shares" edge to the AccountUserQuotaShare entity by IDs.
+func (m *AccountMutation) RemoveUserQuotaShareIDs(ids ...int64) {
+	if m.removeduser_quota_shares == nil {
+		m.removeduser_quota_shares = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.user_quota_shares, ids[i])
+		m.removeduser_quota_shares[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUserQuotaShares returns the removed IDs of the "user_quota_shares" edge to the AccountUserQuotaShare entity.
+func (m *AccountMutation) RemovedUserQuotaSharesIDs() (ids []int64) {
+	for id := range m.removeduser_quota_shares {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UserQuotaSharesIDs returns the "user_quota_shares" edge IDs in the mutation.
+func (m *AccountMutation) UserQuotaSharesIDs() (ids []int64) {
+	for id := range m.user_quota_shares {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUserQuotaShares resets all changes to the "user_quota_shares" edge.
+func (m *AccountMutation) ResetUserQuotaShares() {
+	m.user_quota_shares = nil
+	m.cleareduser_quota_shares = false
+	m.removeduser_quota_shares = nil
+}
+
+// AddQuotaShareUsageIDs adds the "quota_share_usages" edge to the AccountQuotaShareUsage entity by ids.
+func (m *AccountMutation) AddQuotaShareUsageIDs(ids ...int64) {
+	if m.quota_share_usages == nil {
+		m.quota_share_usages = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.quota_share_usages[ids[i]] = struct{}{}
+	}
+}
+
+// ClearQuotaShareUsages clears the "quota_share_usages" edge to the AccountQuotaShareUsage entity.
+func (m *AccountMutation) ClearQuotaShareUsages() {
+	m.clearedquota_share_usages = true
+}
+
+// QuotaShareUsagesCleared reports if the "quota_share_usages" edge to the AccountQuotaShareUsage entity was cleared.
+func (m *AccountMutation) QuotaShareUsagesCleared() bool {
+	return m.clearedquota_share_usages
+}
+
+// RemoveQuotaShareUsageIDs removes the "quota_share_usages" edge to the AccountQuotaShareUsage entity by IDs.
+func (m *AccountMutation) RemoveQuotaShareUsageIDs(ids ...int64) {
+	if m.removedquota_share_usages == nil {
+		m.removedquota_share_usages = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.quota_share_usages, ids[i])
+		m.removedquota_share_usages[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedQuotaShareUsages returns the removed IDs of the "quota_share_usages" edge to the AccountQuotaShareUsage entity.
+func (m *AccountMutation) RemovedQuotaShareUsagesIDs() (ids []int64) {
+	for id := range m.removedquota_share_usages {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// QuotaShareUsagesIDs returns the "quota_share_usages" edge IDs in the mutation.
+func (m *AccountMutation) QuotaShareUsagesIDs() (ids []int64) {
+	for id := range m.quota_share_usages {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetQuotaShareUsages resets all changes to the "quota_share_usages" edge.
+func (m *AccountMutation) ResetQuotaShareUsages() {
+	m.quota_share_usages = nil
+	m.clearedquota_share_usages = false
+	m.removedquota_share_usages = nil
+}
+
+// AddUserQuotaShareUsageIDs adds the "user_quota_share_usages" edge to the AccountUserQuotaShareUsage entity by ids.
+func (m *AccountMutation) AddUserQuotaShareUsageIDs(ids ...int64) {
+	if m.user_quota_share_usages == nil {
+		m.user_quota_share_usages = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.user_quota_share_usages[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUserQuotaShareUsages clears the "user_quota_share_usages" edge to the AccountUserQuotaShareUsage entity.
+func (m *AccountMutation) ClearUserQuotaShareUsages() {
+	m.cleareduser_quota_share_usages = true
+}
+
+// UserQuotaShareUsagesCleared reports if the "user_quota_share_usages" edge to the AccountUserQuotaShareUsage entity was cleared.
+func (m *AccountMutation) UserQuotaShareUsagesCleared() bool {
+	return m.cleareduser_quota_share_usages
+}
+
+// RemoveUserQuotaShareUsageIDs removes the "user_quota_share_usages" edge to the AccountUserQuotaShareUsage entity by IDs.
+func (m *AccountMutation) RemoveUserQuotaShareUsageIDs(ids ...int64) {
+	if m.removeduser_quota_share_usages == nil {
+		m.removeduser_quota_share_usages = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.user_quota_share_usages, ids[i])
+		m.removeduser_quota_share_usages[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUserQuotaShareUsages returns the removed IDs of the "user_quota_share_usages" edge to the AccountUserQuotaShareUsage entity.
+func (m *AccountMutation) RemovedUserQuotaShareUsagesIDs() (ids []int64) {
+	for id := range m.removeduser_quota_share_usages {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UserQuotaShareUsagesIDs returns the "user_quota_share_usages" edge IDs in the mutation.
+func (m *AccountMutation) UserQuotaShareUsagesIDs() (ids []int64) {
+	for id := range m.user_quota_share_usages {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUserQuotaShareUsages resets all changes to the "user_quota_share_usages" edge.
+func (m *AccountMutation) ResetUserQuotaShareUsages() {
+	m.user_quota_share_usages = nil
+	m.cleareduser_quota_share_usages = false
+	m.removeduser_quota_share_usages = nil
+}
+
 // Where appends a list predicates to the AccountMutation builder.
 func (m *AccountMutation) Where(ps ...predicate.Account) {
 	m.predicates = append(m.predicates, ps...)
@@ -5039,7 +5216,7 @@ func (m *AccountMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *AccountMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 8)
 	if m.groups != nil {
 		edges = append(edges, account.EdgeGroups)
 	}
@@ -5054,6 +5231,15 @@ func (m *AccountMutation) AddedEdges() []string {
 	}
 	if m.usage_logs != nil {
 		edges = append(edges, account.EdgeUsageLogs)
+	}
+	if m.user_quota_shares != nil {
+		edges = append(edges, account.EdgeUserQuotaShares)
+	}
+	if m.quota_share_usages != nil {
+		edges = append(edges, account.EdgeQuotaShareUsages)
+	}
+	if m.user_quota_share_usages != nil {
+		edges = append(edges, account.EdgeUserQuotaShareUsages)
 	}
 	return edges
 }
@@ -5088,13 +5274,31 @@ func (m *AccountMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case account.EdgeUserQuotaShares:
+		ids := make([]ent.Value, 0, len(m.user_quota_shares))
+		for id := range m.user_quota_shares {
+			ids = append(ids, id)
+		}
+		return ids
+	case account.EdgeQuotaShareUsages:
+		ids := make([]ent.Value, 0, len(m.quota_share_usages))
+		for id := range m.quota_share_usages {
+			ids = append(ids, id)
+		}
+		return ids
+	case account.EdgeUserQuotaShareUsages:
+		ids := make([]ent.Value, 0, len(m.user_quota_share_usages))
+		for id := range m.user_quota_share_usages {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *AccountMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 8)
 	if m.removedgroups != nil {
 		edges = append(edges, account.EdgeGroups)
 	}
@@ -5103,6 +5307,15 @@ func (m *AccountMutation) RemovedEdges() []string {
 	}
 	if m.removedusage_logs != nil {
 		edges = append(edges, account.EdgeUsageLogs)
+	}
+	if m.removeduser_quota_shares != nil {
+		edges = append(edges, account.EdgeUserQuotaShares)
+	}
+	if m.removedquota_share_usages != nil {
+		edges = append(edges, account.EdgeQuotaShareUsages)
+	}
+	if m.removeduser_quota_share_usages != nil {
+		edges = append(edges, account.EdgeUserQuotaShareUsages)
 	}
 	return edges
 }
@@ -5129,13 +5342,31 @@ func (m *AccountMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case account.EdgeUserQuotaShares:
+		ids := make([]ent.Value, 0, len(m.removeduser_quota_shares))
+		for id := range m.removeduser_quota_shares {
+			ids = append(ids, id)
+		}
+		return ids
+	case account.EdgeQuotaShareUsages:
+		ids := make([]ent.Value, 0, len(m.removedquota_share_usages))
+		for id := range m.removedquota_share_usages {
+			ids = append(ids, id)
+		}
+		return ids
+	case account.EdgeUserQuotaShareUsages:
+		ids := make([]ent.Value, 0, len(m.removeduser_quota_share_usages))
+		for id := range m.removeduser_quota_share_usages {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *AccountMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 8)
 	if m.clearedgroups {
 		edges = append(edges, account.EdgeGroups)
 	}
@@ -5150,6 +5381,15 @@ func (m *AccountMutation) ClearedEdges() []string {
 	}
 	if m.clearedusage_logs {
 		edges = append(edges, account.EdgeUsageLogs)
+	}
+	if m.cleareduser_quota_shares {
+		edges = append(edges, account.EdgeUserQuotaShares)
+	}
+	if m.clearedquota_share_usages {
+		edges = append(edges, account.EdgeQuotaShareUsages)
+	}
+	if m.cleareduser_quota_share_usages {
+		edges = append(edges, account.EdgeUserQuotaShareUsages)
 	}
 	return edges
 }
@@ -5168,6 +5408,12 @@ func (m *AccountMutation) EdgeCleared(name string) bool {
 		return m.clearedchildren
 	case account.EdgeUsageLogs:
 		return m.clearedusage_logs
+	case account.EdgeUserQuotaShares:
+		return m.cleareduser_quota_shares
+	case account.EdgeQuotaShareUsages:
+		return m.clearedquota_share_usages
+	case account.EdgeUserQuotaShareUsages:
+		return m.cleareduser_quota_share_usages
 	}
 	return false
 }
@@ -5204,6 +5450,15 @@ func (m *AccountMutation) ResetEdge(name string) error {
 		return nil
 	case account.EdgeUsageLogs:
 		m.ResetUsageLogs()
+		return nil
+	case account.EdgeUserQuotaShares:
+		m.ResetUserQuotaShares()
+		return nil
+	case account.EdgeQuotaShareUsages:
+		m.ResetQuotaShareUsages()
+		return nil
+	case account.EdgeUserQuotaShareUsages:
+		m.ResetUserQuotaShareUsages()
 		return nil
 	}
 	return fmt.Errorf("unknown Account edge %s", name)
@@ -5692,6 +5947,2103 @@ func (m *AccountGroupMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown AccountGroup edge %s", name)
+}
+
+// AccountQuotaShareUsageMutation represents an operation that mutates the AccountQuotaShareUsage nodes in the graph.
+type AccountQuotaShareUsageMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *int64
+	window_kind    *string
+	reset_at       *time.Time
+	cost           *float64
+	addcost        *float64
+	clearedFields  map[string]struct{}
+	account        *int64
+	clearedaccount bool
+	done           bool
+	oldValue       func(context.Context) (*AccountQuotaShareUsage, error)
+	predicates     []predicate.AccountQuotaShareUsage
+}
+
+var _ ent.Mutation = (*AccountQuotaShareUsageMutation)(nil)
+
+// accountquotashareusageOption allows management of the mutation configuration using functional options.
+type accountquotashareusageOption func(*AccountQuotaShareUsageMutation)
+
+// newAccountQuotaShareUsageMutation creates new mutation for the AccountQuotaShareUsage entity.
+func newAccountQuotaShareUsageMutation(c config, op Op, opts ...accountquotashareusageOption) *AccountQuotaShareUsageMutation {
+	m := &AccountQuotaShareUsageMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAccountQuotaShareUsage,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAccountQuotaShareUsageID sets the ID field of the mutation.
+func withAccountQuotaShareUsageID(id int64) accountquotashareusageOption {
+	return func(m *AccountQuotaShareUsageMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AccountQuotaShareUsage
+		)
+		m.oldValue = func(ctx context.Context) (*AccountQuotaShareUsage, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AccountQuotaShareUsage.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAccountQuotaShareUsage sets the old AccountQuotaShareUsage of the mutation.
+func withAccountQuotaShareUsage(node *AccountQuotaShareUsage) accountquotashareusageOption {
+	return func(m *AccountQuotaShareUsageMutation) {
+		m.oldValue = func(context.Context) (*AccountQuotaShareUsage, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AccountQuotaShareUsageMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AccountQuotaShareUsageMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AccountQuotaShareUsageMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AccountQuotaShareUsageMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AccountQuotaShareUsage.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetAccountID sets the "account_id" field.
+func (m *AccountQuotaShareUsageMutation) SetAccountID(i int64) {
+	m.account = &i
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *AccountQuotaShareUsageMutation) AccountID() (r int64, exists bool) {
+	v := m.account
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the AccountQuotaShareUsage entity.
+// If the AccountQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountQuotaShareUsageMutation) OldAccountID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *AccountQuotaShareUsageMutation) ResetAccountID() {
+	m.account = nil
+}
+
+// SetWindowKind sets the "window_kind" field.
+func (m *AccountQuotaShareUsageMutation) SetWindowKind(s string) {
+	m.window_kind = &s
+}
+
+// WindowKind returns the value of the "window_kind" field in the mutation.
+func (m *AccountQuotaShareUsageMutation) WindowKind() (r string, exists bool) {
+	v := m.window_kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWindowKind returns the old "window_kind" field's value of the AccountQuotaShareUsage entity.
+// If the AccountQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountQuotaShareUsageMutation) OldWindowKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWindowKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWindowKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWindowKind: %w", err)
+	}
+	return oldValue.WindowKind, nil
+}
+
+// ResetWindowKind resets all changes to the "window_kind" field.
+func (m *AccountQuotaShareUsageMutation) ResetWindowKind() {
+	m.window_kind = nil
+}
+
+// SetResetAt sets the "reset_at" field.
+func (m *AccountQuotaShareUsageMutation) SetResetAt(t time.Time) {
+	m.reset_at = &t
+}
+
+// ResetAt returns the value of the "reset_at" field in the mutation.
+func (m *AccountQuotaShareUsageMutation) ResetAt() (r time.Time, exists bool) {
+	v := m.reset_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResetAt returns the old "reset_at" field's value of the AccountQuotaShareUsage entity.
+// If the AccountQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountQuotaShareUsageMutation) OldResetAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResetAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResetAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResetAt: %w", err)
+	}
+	return oldValue.ResetAt, nil
+}
+
+// ResetResetAt resets all changes to the "reset_at" field.
+func (m *AccountQuotaShareUsageMutation) ResetResetAt() {
+	m.reset_at = nil
+}
+
+// SetCost sets the "cost" field.
+func (m *AccountQuotaShareUsageMutation) SetCost(f float64) {
+	m.cost = &f
+	m.addcost = nil
+}
+
+// Cost returns the value of the "cost" field in the mutation.
+func (m *AccountQuotaShareUsageMutation) Cost() (r float64, exists bool) {
+	v := m.cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCost returns the old "cost" field's value of the AccountQuotaShareUsage entity.
+// If the AccountQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountQuotaShareUsageMutation) OldCost(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCost: %w", err)
+	}
+	return oldValue.Cost, nil
+}
+
+// AddCost adds f to the "cost" field.
+func (m *AccountQuotaShareUsageMutation) AddCost(f float64) {
+	if m.addcost != nil {
+		*m.addcost += f
+	} else {
+		m.addcost = &f
+	}
+}
+
+// AddedCost returns the value that was added to the "cost" field in this mutation.
+func (m *AccountQuotaShareUsageMutation) AddedCost() (r float64, exists bool) {
+	v := m.addcost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCost resets all changes to the "cost" field.
+func (m *AccountQuotaShareUsageMutation) ResetCost() {
+	m.cost = nil
+	m.addcost = nil
+}
+
+// ClearAccount clears the "account" edge to the Account entity.
+func (m *AccountQuotaShareUsageMutation) ClearAccount() {
+	m.clearedaccount = true
+	m.clearedFields[accountquotashareusage.FieldAccountID] = struct{}{}
+}
+
+// AccountCleared reports if the "account" edge to the Account entity was cleared.
+func (m *AccountQuotaShareUsageMutation) AccountCleared() bool {
+	return m.clearedaccount
+}
+
+// AccountIDs returns the "account" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// AccountID instead. It exists only for internal usage by the builders.
+func (m *AccountQuotaShareUsageMutation) AccountIDs() (ids []int64) {
+	if id := m.account; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetAccount resets all changes to the "account" edge.
+func (m *AccountQuotaShareUsageMutation) ResetAccount() {
+	m.account = nil
+	m.clearedaccount = false
+}
+
+// Where appends a list predicates to the AccountQuotaShareUsageMutation builder.
+func (m *AccountQuotaShareUsageMutation) Where(ps ...predicate.AccountQuotaShareUsage) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AccountQuotaShareUsageMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AccountQuotaShareUsageMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AccountQuotaShareUsage, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AccountQuotaShareUsageMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AccountQuotaShareUsageMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AccountQuotaShareUsage).
+func (m *AccountQuotaShareUsageMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AccountQuotaShareUsageMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.account != nil {
+		fields = append(fields, accountquotashareusage.FieldAccountID)
+	}
+	if m.window_kind != nil {
+		fields = append(fields, accountquotashareusage.FieldWindowKind)
+	}
+	if m.reset_at != nil {
+		fields = append(fields, accountquotashareusage.FieldResetAt)
+	}
+	if m.cost != nil {
+		fields = append(fields, accountquotashareusage.FieldCost)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AccountQuotaShareUsageMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case accountquotashareusage.FieldAccountID:
+		return m.AccountID()
+	case accountquotashareusage.FieldWindowKind:
+		return m.WindowKind()
+	case accountquotashareusage.FieldResetAt:
+		return m.ResetAt()
+	case accountquotashareusage.FieldCost:
+		return m.Cost()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AccountQuotaShareUsageMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case accountquotashareusage.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case accountquotashareusage.FieldWindowKind:
+		return m.OldWindowKind(ctx)
+	case accountquotashareusage.FieldResetAt:
+		return m.OldResetAt(ctx)
+	case accountquotashareusage.FieldCost:
+		return m.OldCost(ctx)
+	}
+	return nil, fmt.Errorf("unknown AccountQuotaShareUsage field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountQuotaShareUsageMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case accountquotashareusage.FieldAccountID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case accountquotashareusage.FieldWindowKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWindowKind(v)
+		return nil
+	case accountquotashareusage.FieldResetAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResetAt(v)
+		return nil
+	case accountquotashareusage.FieldCost:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCost(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountQuotaShareUsage field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AccountQuotaShareUsageMutation) AddedFields() []string {
+	var fields []string
+	if m.addcost != nil {
+		fields = append(fields, accountquotashareusage.FieldCost)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AccountQuotaShareUsageMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case accountquotashareusage.FieldCost:
+		return m.AddedCost()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountQuotaShareUsageMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case accountquotashareusage.FieldCost:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCost(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountQuotaShareUsage numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AccountQuotaShareUsageMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AccountQuotaShareUsageMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AccountQuotaShareUsageMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown AccountQuotaShareUsage nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AccountQuotaShareUsageMutation) ResetField(name string) error {
+	switch name {
+	case accountquotashareusage.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case accountquotashareusage.FieldWindowKind:
+		m.ResetWindowKind()
+		return nil
+	case accountquotashareusage.FieldResetAt:
+		m.ResetResetAt()
+		return nil
+	case accountquotashareusage.FieldCost:
+		m.ResetCost()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountQuotaShareUsage field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AccountQuotaShareUsageMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.account != nil {
+		edges = append(edges, accountquotashareusage.EdgeAccount)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AccountQuotaShareUsageMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case accountquotashareusage.EdgeAccount:
+		if id := m.account; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AccountQuotaShareUsageMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AccountQuotaShareUsageMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AccountQuotaShareUsageMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedaccount {
+		edges = append(edges, accountquotashareusage.EdgeAccount)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AccountQuotaShareUsageMutation) EdgeCleared(name string) bool {
+	switch name {
+	case accountquotashareusage.EdgeAccount:
+		return m.clearedaccount
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AccountQuotaShareUsageMutation) ClearEdge(name string) error {
+	switch name {
+	case accountquotashareusage.EdgeAccount:
+		m.ClearAccount()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountQuotaShareUsage unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AccountQuotaShareUsageMutation) ResetEdge(name string) error {
+	switch name {
+	case accountquotashareusage.EdgeAccount:
+		m.ResetAccount()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountQuotaShareUsage edge %s", name)
+}
+
+// AccountUserQuotaShareMutation represents an operation that mutates the AccountUserQuotaShare nodes in the graph.
+type AccountUserQuotaShareMutation struct {
+	config
+	op                   Op
+	typ                  string
+	id                   *int64
+	created_at           *time.Time
+	updated_at           *time.Time
+	deleted_at           *time.Time
+	five_hour_percent    *float64
+	addfive_hour_percent *float64
+	seven_day_percent    *float64
+	addseven_day_percent *float64
+	clearedFields        map[string]struct{}
+	account              *int64
+	clearedaccount       bool
+	user                 *int64
+	cleareduser          bool
+	done                 bool
+	oldValue             func(context.Context) (*AccountUserQuotaShare, error)
+	predicates           []predicate.AccountUserQuotaShare
+}
+
+var _ ent.Mutation = (*AccountUserQuotaShareMutation)(nil)
+
+// accountuserquotashareOption allows management of the mutation configuration using functional options.
+type accountuserquotashareOption func(*AccountUserQuotaShareMutation)
+
+// newAccountUserQuotaShareMutation creates new mutation for the AccountUserQuotaShare entity.
+func newAccountUserQuotaShareMutation(c config, op Op, opts ...accountuserquotashareOption) *AccountUserQuotaShareMutation {
+	m := &AccountUserQuotaShareMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAccountUserQuotaShare,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAccountUserQuotaShareID sets the ID field of the mutation.
+func withAccountUserQuotaShareID(id int64) accountuserquotashareOption {
+	return func(m *AccountUserQuotaShareMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AccountUserQuotaShare
+		)
+		m.oldValue = func(ctx context.Context) (*AccountUserQuotaShare, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AccountUserQuotaShare.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAccountUserQuotaShare sets the old AccountUserQuotaShare of the mutation.
+func withAccountUserQuotaShare(node *AccountUserQuotaShare) accountuserquotashareOption {
+	return func(m *AccountUserQuotaShareMutation) {
+		m.oldValue = func(context.Context) (*AccountUserQuotaShare, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AccountUserQuotaShareMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AccountUserQuotaShareMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AccountUserQuotaShareMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AccountUserQuotaShareMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AccountUserQuotaShare.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *AccountUserQuotaShareMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *AccountUserQuotaShareMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the AccountUserQuotaShare entity.
+// If the AccountUserQuotaShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *AccountUserQuotaShareMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *AccountUserQuotaShareMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *AccountUserQuotaShareMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the AccountUserQuotaShare entity.
+// If the AccountUserQuotaShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *AccountUserQuotaShareMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (m *AccountUserQuotaShareMutation) SetDeletedAt(t time.Time) {
+	m.deleted_at = &t
+}
+
+// DeletedAt returns the value of the "deleted_at" field in the mutation.
+func (m *AccountUserQuotaShareMutation) DeletedAt() (r time.Time, exists bool) {
+	v := m.deleted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeletedAt returns the old "deleted_at" field's value of the AccountUserQuotaShare entity.
+// If the AccountUserQuotaShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
+	}
+	return oldValue.DeletedAt, nil
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (m *AccountUserQuotaShareMutation) ClearDeletedAt() {
+	m.deleted_at = nil
+	m.clearedFields[accountuserquotashare.FieldDeletedAt] = struct{}{}
+}
+
+// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
+func (m *AccountUserQuotaShareMutation) DeletedAtCleared() bool {
+	_, ok := m.clearedFields[accountuserquotashare.FieldDeletedAt]
+	return ok
+}
+
+// ResetDeletedAt resets all changes to the "deleted_at" field.
+func (m *AccountUserQuotaShareMutation) ResetDeletedAt() {
+	m.deleted_at = nil
+	delete(m.clearedFields, accountuserquotashare.FieldDeletedAt)
+}
+
+// SetAccountID sets the "account_id" field.
+func (m *AccountUserQuotaShareMutation) SetAccountID(i int64) {
+	m.account = &i
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *AccountUserQuotaShareMutation) AccountID() (r int64, exists bool) {
+	v := m.account
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the AccountUserQuotaShare entity.
+// If the AccountUserQuotaShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareMutation) OldAccountID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *AccountUserQuotaShareMutation) ResetAccountID() {
+	m.account = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *AccountUserQuotaShareMutation) SetUserID(i int64) {
+	m.user = &i
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *AccountUserQuotaShareMutation) UserID() (r int64, exists bool) {
+	v := m.user
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the AccountUserQuotaShare entity.
+// If the AccountUserQuotaShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareMutation) OldUserID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *AccountUserQuotaShareMutation) ResetUserID() {
+	m.user = nil
+}
+
+// SetFiveHourPercent sets the "five_hour_percent" field.
+func (m *AccountUserQuotaShareMutation) SetFiveHourPercent(f float64) {
+	m.five_hour_percent = &f
+	m.addfive_hour_percent = nil
+}
+
+// FiveHourPercent returns the value of the "five_hour_percent" field in the mutation.
+func (m *AccountUserQuotaShareMutation) FiveHourPercent() (r float64, exists bool) {
+	v := m.five_hour_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFiveHourPercent returns the old "five_hour_percent" field's value of the AccountUserQuotaShare entity.
+// If the AccountUserQuotaShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareMutation) OldFiveHourPercent(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFiveHourPercent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFiveHourPercent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFiveHourPercent: %w", err)
+	}
+	return oldValue.FiveHourPercent, nil
+}
+
+// AddFiveHourPercent adds f to the "five_hour_percent" field.
+func (m *AccountUserQuotaShareMutation) AddFiveHourPercent(f float64) {
+	if m.addfive_hour_percent != nil {
+		*m.addfive_hour_percent += f
+	} else {
+		m.addfive_hour_percent = &f
+	}
+}
+
+// AddedFiveHourPercent returns the value that was added to the "five_hour_percent" field in this mutation.
+func (m *AccountUserQuotaShareMutation) AddedFiveHourPercent() (r float64, exists bool) {
+	v := m.addfive_hour_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFiveHourPercent resets all changes to the "five_hour_percent" field.
+func (m *AccountUserQuotaShareMutation) ResetFiveHourPercent() {
+	m.five_hour_percent = nil
+	m.addfive_hour_percent = nil
+}
+
+// SetSevenDayPercent sets the "seven_day_percent" field.
+func (m *AccountUserQuotaShareMutation) SetSevenDayPercent(f float64) {
+	m.seven_day_percent = &f
+	m.addseven_day_percent = nil
+}
+
+// SevenDayPercent returns the value of the "seven_day_percent" field in the mutation.
+func (m *AccountUserQuotaShareMutation) SevenDayPercent() (r float64, exists bool) {
+	v := m.seven_day_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSevenDayPercent returns the old "seven_day_percent" field's value of the AccountUserQuotaShare entity.
+// If the AccountUserQuotaShare object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareMutation) OldSevenDayPercent(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSevenDayPercent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSevenDayPercent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSevenDayPercent: %w", err)
+	}
+	return oldValue.SevenDayPercent, nil
+}
+
+// AddSevenDayPercent adds f to the "seven_day_percent" field.
+func (m *AccountUserQuotaShareMutation) AddSevenDayPercent(f float64) {
+	if m.addseven_day_percent != nil {
+		*m.addseven_day_percent += f
+	} else {
+		m.addseven_day_percent = &f
+	}
+}
+
+// AddedSevenDayPercent returns the value that was added to the "seven_day_percent" field in this mutation.
+func (m *AccountUserQuotaShareMutation) AddedSevenDayPercent() (r float64, exists bool) {
+	v := m.addseven_day_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSevenDayPercent resets all changes to the "seven_day_percent" field.
+func (m *AccountUserQuotaShareMutation) ResetSevenDayPercent() {
+	m.seven_day_percent = nil
+	m.addseven_day_percent = nil
+}
+
+// ClearAccount clears the "account" edge to the Account entity.
+func (m *AccountUserQuotaShareMutation) ClearAccount() {
+	m.clearedaccount = true
+	m.clearedFields[accountuserquotashare.FieldAccountID] = struct{}{}
+}
+
+// AccountCleared reports if the "account" edge to the Account entity was cleared.
+func (m *AccountUserQuotaShareMutation) AccountCleared() bool {
+	return m.clearedaccount
+}
+
+// AccountIDs returns the "account" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// AccountID instead. It exists only for internal usage by the builders.
+func (m *AccountUserQuotaShareMutation) AccountIDs() (ids []int64) {
+	if id := m.account; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetAccount resets all changes to the "account" edge.
+func (m *AccountUserQuotaShareMutation) ResetAccount() {
+	m.account = nil
+	m.clearedaccount = false
+}
+
+// ClearUser clears the "user" edge to the User entity.
+func (m *AccountUserQuotaShareMutation) ClearUser() {
+	m.cleareduser = true
+	m.clearedFields[accountuserquotashare.FieldUserID] = struct{}{}
+}
+
+// UserCleared reports if the "user" edge to the User entity was cleared.
+func (m *AccountUserQuotaShareMutation) UserCleared() bool {
+	return m.cleareduser
+}
+
+// UserIDs returns the "user" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// UserID instead. It exists only for internal usage by the builders.
+func (m *AccountUserQuotaShareMutation) UserIDs() (ids []int64) {
+	if id := m.user; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetUser resets all changes to the "user" edge.
+func (m *AccountUserQuotaShareMutation) ResetUser() {
+	m.user = nil
+	m.cleareduser = false
+}
+
+// Where appends a list predicates to the AccountUserQuotaShareMutation builder.
+func (m *AccountUserQuotaShareMutation) Where(ps ...predicate.AccountUserQuotaShare) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AccountUserQuotaShareMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AccountUserQuotaShareMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AccountUserQuotaShare, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AccountUserQuotaShareMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AccountUserQuotaShareMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AccountUserQuotaShare).
+func (m *AccountUserQuotaShareMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AccountUserQuotaShareMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.created_at != nil {
+		fields = append(fields, accountuserquotashare.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, accountuserquotashare.FieldUpdatedAt)
+	}
+	if m.deleted_at != nil {
+		fields = append(fields, accountuserquotashare.FieldDeletedAt)
+	}
+	if m.account != nil {
+		fields = append(fields, accountuserquotashare.FieldAccountID)
+	}
+	if m.user != nil {
+		fields = append(fields, accountuserquotashare.FieldUserID)
+	}
+	if m.five_hour_percent != nil {
+		fields = append(fields, accountuserquotashare.FieldFiveHourPercent)
+	}
+	if m.seven_day_percent != nil {
+		fields = append(fields, accountuserquotashare.FieldSevenDayPercent)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AccountUserQuotaShareMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case accountuserquotashare.FieldCreatedAt:
+		return m.CreatedAt()
+	case accountuserquotashare.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case accountuserquotashare.FieldDeletedAt:
+		return m.DeletedAt()
+	case accountuserquotashare.FieldAccountID:
+		return m.AccountID()
+	case accountuserquotashare.FieldUserID:
+		return m.UserID()
+	case accountuserquotashare.FieldFiveHourPercent:
+		return m.FiveHourPercent()
+	case accountuserquotashare.FieldSevenDayPercent:
+		return m.SevenDayPercent()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AccountUserQuotaShareMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case accountuserquotashare.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case accountuserquotashare.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case accountuserquotashare.FieldDeletedAt:
+		return m.OldDeletedAt(ctx)
+	case accountuserquotashare.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case accountuserquotashare.FieldUserID:
+		return m.OldUserID(ctx)
+	case accountuserquotashare.FieldFiveHourPercent:
+		return m.OldFiveHourPercent(ctx)
+	case accountuserquotashare.FieldSevenDayPercent:
+		return m.OldSevenDayPercent(ctx)
+	}
+	return nil, fmt.Errorf("unknown AccountUserQuotaShare field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountUserQuotaShareMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case accountuserquotashare.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case accountuserquotashare.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case accountuserquotashare.FieldDeletedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeletedAt(v)
+		return nil
+	case accountuserquotashare.FieldAccountID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case accountuserquotashare.FieldUserID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case accountuserquotashare.FieldFiveHourPercent:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFiveHourPercent(v)
+		return nil
+	case accountuserquotashare.FieldSevenDayPercent:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSevenDayPercent(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShare field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AccountUserQuotaShareMutation) AddedFields() []string {
+	var fields []string
+	if m.addfive_hour_percent != nil {
+		fields = append(fields, accountuserquotashare.FieldFiveHourPercent)
+	}
+	if m.addseven_day_percent != nil {
+		fields = append(fields, accountuserquotashare.FieldSevenDayPercent)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AccountUserQuotaShareMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case accountuserquotashare.FieldFiveHourPercent:
+		return m.AddedFiveHourPercent()
+	case accountuserquotashare.FieldSevenDayPercent:
+		return m.AddedSevenDayPercent()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountUserQuotaShareMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case accountuserquotashare.FieldFiveHourPercent:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFiveHourPercent(v)
+		return nil
+	case accountuserquotashare.FieldSevenDayPercent:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSevenDayPercent(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShare numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AccountUserQuotaShareMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(accountuserquotashare.FieldDeletedAt) {
+		fields = append(fields, accountuserquotashare.FieldDeletedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AccountUserQuotaShareMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AccountUserQuotaShareMutation) ClearField(name string) error {
+	switch name {
+	case accountuserquotashare.FieldDeletedAt:
+		m.ClearDeletedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShare nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AccountUserQuotaShareMutation) ResetField(name string) error {
+	switch name {
+	case accountuserquotashare.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case accountuserquotashare.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case accountuserquotashare.FieldDeletedAt:
+		m.ResetDeletedAt()
+		return nil
+	case accountuserquotashare.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case accountuserquotashare.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case accountuserquotashare.FieldFiveHourPercent:
+		m.ResetFiveHourPercent()
+		return nil
+	case accountuserquotashare.FieldSevenDayPercent:
+		m.ResetSevenDayPercent()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShare field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AccountUserQuotaShareMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.account != nil {
+		edges = append(edges, accountuserquotashare.EdgeAccount)
+	}
+	if m.user != nil {
+		edges = append(edges, accountuserquotashare.EdgeUser)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AccountUserQuotaShareMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case accountuserquotashare.EdgeAccount:
+		if id := m.account; id != nil {
+			return []ent.Value{*id}
+		}
+	case accountuserquotashare.EdgeUser:
+		if id := m.user; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AccountUserQuotaShareMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AccountUserQuotaShareMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AccountUserQuotaShareMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedaccount {
+		edges = append(edges, accountuserquotashare.EdgeAccount)
+	}
+	if m.cleareduser {
+		edges = append(edges, accountuserquotashare.EdgeUser)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AccountUserQuotaShareMutation) EdgeCleared(name string) bool {
+	switch name {
+	case accountuserquotashare.EdgeAccount:
+		return m.clearedaccount
+	case accountuserquotashare.EdgeUser:
+		return m.cleareduser
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AccountUserQuotaShareMutation) ClearEdge(name string) error {
+	switch name {
+	case accountuserquotashare.EdgeAccount:
+		m.ClearAccount()
+		return nil
+	case accountuserquotashare.EdgeUser:
+		m.ClearUser()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShare unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AccountUserQuotaShareMutation) ResetEdge(name string) error {
+	switch name {
+	case accountuserquotashare.EdgeAccount:
+		m.ResetAccount()
+		return nil
+	case accountuserquotashare.EdgeUser:
+		m.ResetUser()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShare edge %s", name)
+}
+
+// AccountUserQuotaShareUsageMutation represents an operation that mutates the AccountUserQuotaShareUsage nodes in the graph.
+type AccountUserQuotaShareUsageMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *int64
+	window_kind    *string
+	reset_at       *time.Time
+	cost           *float64
+	addcost        *float64
+	clearedFields  map[string]struct{}
+	account        *int64
+	clearedaccount bool
+	user           *int64
+	cleareduser    bool
+	done           bool
+	oldValue       func(context.Context) (*AccountUserQuotaShareUsage, error)
+	predicates     []predicate.AccountUserQuotaShareUsage
+}
+
+var _ ent.Mutation = (*AccountUserQuotaShareUsageMutation)(nil)
+
+// accountuserquotashareusageOption allows management of the mutation configuration using functional options.
+type accountuserquotashareusageOption func(*AccountUserQuotaShareUsageMutation)
+
+// newAccountUserQuotaShareUsageMutation creates new mutation for the AccountUserQuotaShareUsage entity.
+func newAccountUserQuotaShareUsageMutation(c config, op Op, opts ...accountuserquotashareusageOption) *AccountUserQuotaShareUsageMutation {
+	m := &AccountUserQuotaShareUsageMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAccountUserQuotaShareUsage,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAccountUserQuotaShareUsageID sets the ID field of the mutation.
+func withAccountUserQuotaShareUsageID(id int64) accountuserquotashareusageOption {
+	return func(m *AccountUserQuotaShareUsageMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AccountUserQuotaShareUsage
+		)
+		m.oldValue = func(ctx context.Context) (*AccountUserQuotaShareUsage, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AccountUserQuotaShareUsage.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAccountUserQuotaShareUsage sets the old AccountUserQuotaShareUsage of the mutation.
+func withAccountUserQuotaShareUsage(node *AccountUserQuotaShareUsage) accountuserquotashareusageOption {
+	return func(m *AccountUserQuotaShareUsageMutation) {
+		m.oldValue = func(context.Context) (*AccountUserQuotaShareUsage, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AccountUserQuotaShareUsageMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AccountUserQuotaShareUsageMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AccountUserQuotaShareUsageMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AccountUserQuotaShareUsageMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AccountUserQuotaShareUsage.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetAccountID sets the "account_id" field.
+func (m *AccountUserQuotaShareUsageMutation) SetAccountID(i int64) {
+	m.account = &i
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *AccountUserQuotaShareUsageMutation) AccountID() (r int64, exists bool) {
+	v := m.account
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the AccountUserQuotaShareUsage entity.
+// If the AccountUserQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareUsageMutation) OldAccountID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *AccountUserQuotaShareUsageMutation) ResetAccountID() {
+	m.account = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *AccountUserQuotaShareUsageMutation) SetUserID(i int64) {
+	m.user = &i
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *AccountUserQuotaShareUsageMutation) UserID() (r int64, exists bool) {
+	v := m.user
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the AccountUserQuotaShareUsage entity.
+// If the AccountUserQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareUsageMutation) OldUserID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *AccountUserQuotaShareUsageMutation) ResetUserID() {
+	m.user = nil
+}
+
+// SetWindowKind sets the "window_kind" field.
+func (m *AccountUserQuotaShareUsageMutation) SetWindowKind(s string) {
+	m.window_kind = &s
+}
+
+// WindowKind returns the value of the "window_kind" field in the mutation.
+func (m *AccountUserQuotaShareUsageMutation) WindowKind() (r string, exists bool) {
+	v := m.window_kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWindowKind returns the old "window_kind" field's value of the AccountUserQuotaShareUsage entity.
+// If the AccountUserQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareUsageMutation) OldWindowKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWindowKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWindowKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWindowKind: %w", err)
+	}
+	return oldValue.WindowKind, nil
+}
+
+// ResetWindowKind resets all changes to the "window_kind" field.
+func (m *AccountUserQuotaShareUsageMutation) ResetWindowKind() {
+	m.window_kind = nil
+}
+
+// SetResetAt sets the "reset_at" field.
+func (m *AccountUserQuotaShareUsageMutation) SetResetAt(t time.Time) {
+	m.reset_at = &t
+}
+
+// ResetAt returns the value of the "reset_at" field in the mutation.
+func (m *AccountUserQuotaShareUsageMutation) ResetAt() (r time.Time, exists bool) {
+	v := m.reset_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResetAt returns the old "reset_at" field's value of the AccountUserQuotaShareUsage entity.
+// If the AccountUserQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareUsageMutation) OldResetAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResetAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResetAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResetAt: %w", err)
+	}
+	return oldValue.ResetAt, nil
+}
+
+// ResetResetAt resets all changes to the "reset_at" field.
+func (m *AccountUserQuotaShareUsageMutation) ResetResetAt() {
+	m.reset_at = nil
+}
+
+// SetCost sets the "cost" field.
+func (m *AccountUserQuotaShareUsageMutation) SetCost(f float64) {
+	m.cost = &f
+	m.addcost = nil
+}
+
+// Cost returns the value of the "cost" field in the mutation.
+func (m *AccountUserQuotaShareUsageMutation) Cost() (r float64, exists bool) {
+	v := m.cost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCost returns the old "cost" field's value of the AccountUserQuotaShareUsage entity.
+// If the AccountUserQuotaShareUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountUserQuotaShareUsageMutation) OldCost(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCost: %w", err)
+	}
+	return oldValue.Cost, nil
+}
+
+// AddCost adds f to the "cost" field.
+func (m *AccountUserQuotaShareUsageMutation) AddCost(f float64) {
+	if m.addcost != nil {
+		*m.addcost += f
+	} else {
+		m.addcost = &f
+	}
+}
+
+// AddedCost returns the value that was added to the "cost" field in this mutation.
+func (m *AccountUserQuotaShareUsageMutation) AddedCost() (r float64, exists bool) {
+	v := m.addcost
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCost resets all changes to the "cost" field.
+func (m *AccountUserQuotaShareUsageMutation) ResetCost() {
+	m.cost = nil
+	m.addcost = nil
+}
+
+// ClearAccount clears the "account" edge to the Account entity.
+func (m *AccountUserQuotaShareUsageMutation) ClearAccount() {
+	m.clearedaccount = true
+	m.clearedFields[accountuserquotashareusage.FieldAccountID] = struct{}{}
+}
+
+// AccountCleared reports if the "account" edge to the Account entity was cleared.
+func (m *AccountUserQuotaShareUsageMutation) AccountCleared() bool {
+	return m.clearedaccount
+}
+
+// AccountIDs returns the "account" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// AccountID instead. It exists only for internal usage by the builders.
+func (m *AccountUserQuotaShareUsageMutation) AccountIDs() (ids []int64) {
+	if id := m.account; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetAccount resets all changes to the "account" edge.
+func (m *AccountUserQuotaShareUsageMutation) ResetAccount() {
+	m.account = nil
+	m.clearedaccount = false
+}
+
+// ClearUser clears the "user" edge to the User entity.
+func (m *AccountUserQuotaShareUsageMutation) ClearUser() {
+	m.cleareduser = true
+	m.clearedFields[accountuserquotashareusage.FieldUserID] = struct{}{}
+}
+
+// UserCleared reports if the "user" edge to the User entity was cleared.
+func (m *AccountUserQuotaShareUsageMutation) UserCleared() bool {
+	return m.cleareduser
+}
+
+// UserIDs returns the "user" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// UserID instead. It exists only for internal usage by the builders.
+func (m *AccountUserQuotaShareUsageMutation) UserIDs() (ids []int64) {
+	if id := m.user; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetUser resets all changes to the "user" edge.
+func (m *AccountUserQuotaShareUsageMutation) ResetUser() {
+	m.user = nil
+	m.cleareduser = false
+}
+
+// Where appends a list predicates to the AccountUserQuotaShareUsageMutation builder.
+func (m *AccountUserQuotaShareUsageMutation) Where(ps ...predicate.AccountUserQuotaShareUsage) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AccountUserQuotaShareUsageMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AccountUserQuotaShareUsageMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AccountUserQuotaShareUsage, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AccountUserQuotaShareUsageMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AccountUserQuotaShareUsageMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AccountUserQuotaShareUsage).
+func (m *AccountUserQuotaShareUsageMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AccountUserQuotaShareUsageMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.account != nil {
+		fields = append(fields, accountuserquotashareusage.FieldAccountID)
+	}
+	if m.user != nil {
+		fields = append(fields, accountuserquotashareusage.FieldUserID)
+	}
+	if m.window_kind != nil {
+		fields = append(fields, accountuserquotashareusage.FieldWindowKind)
+	}
+	if m.reset_at != nil {
+		fields = append(fields, accountuserquotashareusage.FieldResetAt)
+	}
+	if m.cost != nil {
+		fields = append(fields, accountuserquotashareusage.FieldCost)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AccountUserQuotaShareUsageMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case accountuserquotashareusage.FieldAccountID:
+		return m.AccountID()
+	case accountuserquotashareusage.FieldUserID:
+		return m.UserID()
+	case accountuserquotashareusage.FieldWindowKind:
+		return m.WindowKind()
+	case accountuserquotashareusage.FieldResetAt:
+		return m.ResetAt()
+	case accountuserquotashareusage.FieldCost:
+		return m.Cost()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AccountUserQuotaShareUsageMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case accountuserquotashareusage.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case accountuserquotashareusage.FieldUserID:
+		return m.OldUserID(ctx)
+	case accountuserquotashareusage.FieldWindowKind:
+		return m.OldWindowKind(ctx)
+	case accountuserquotashareusage.FieldResetAt:
+		return m.OldResetAt(ctx)
+	case accountuserquotashareusage.FieldCost:
+		return m.OldCost(ctx)
+	}
+	return nil, fmt.Errorf("unknown AccountUserQuotaShareUsage field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountUserQuotaShareUsageMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case accountuserquotashareusage.FieldAccountID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case accountuserquotashareusage.FieldUserID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case accountuserquotashareusage.FieldWindowKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWindowKind(v)
+		return nil
+	case accountuserquotashareusage.FieldResetAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResetAt(v)
+		return nil
+	case accountuserquotashareusage.FieldCost:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCost(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShareUsage field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AccountUserQuotaShareUsageMutation) AddedFields() []string {
+	var fields []string
+	if m.addcost != nil {
+		fields = append(fields, accountuserquotashareusage.FieldCost)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AccountUserQuotaShareUsageMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case accountuserquotashareusage.FieldCost:
+		return m.AddedCost()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AccountUserQuotaShareUsageMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case accountuserquotashareusage.FieldCost:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCost(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShareUsage numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AccountUserQuotaShareUsageMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AccountUserQuotaShareUsageMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AccountUserQuotaShareUsageMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown AccountUserQuotaShareUsage nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AccountUserQuotaShareUsageMutation) ResetField(name string) error {
+	switch name {
+	case accountuserquotashareusage.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case accountuserquotashareusage.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case accountuserquotashareusage.FieldWindowKind:
+		m.ResetWindowKind()
+		return nil
+	case accountuserquotashareusage.FieldResetAt:
+		m.ResetResetAt()
+		return nil
+	case accountuserquotashareusage.FieldCost:
+		m.ResetCost()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShareUsage field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AccountUserQuotaShareUsageMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.account != nil {
+		edges = append(edges, accountuserquotashareusage.EdgeAccount)
+	}
+	if m.user != nil {
+		edges = append(edges, accountuserquotashareusage.EdgeUser)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AccountUserQuotaShareUsageMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case accountuserquotashareusage.EdgeAccount:
+		if id := m.account; id != nil {
+			return []ent.Value{*id}
+		}
+	case accountuserquotashareusage.EdgeUser:
+		if id := m.user; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AccountUserQuotaShareUsageMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AccountUserQuotaShareUsageMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AccountUserQuotaShareUsageMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedaccount {
+		edges = append(edges, accountuserquotashareusage.EdgeAccount)
+	}
+	if m.cleareduser {
+		edges = append(edges, accountuserquotashareusage.EdgeUser)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AccountUserQuotaShareUsageMutation) EdgeCleared(name string) bool {
+	switch name {
+	case accountuserquotashareusage.EdgeAccount:
+		return m.clearedaccount
+	case accountuserquotashareusage.EdgeUser:
+		return m.cleareduser
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AccountUserQuotaShareUsageMutation) ClearEdge(name string) error {
+	switch name {
+	case accountuserquotashareusage.EdgeAccount:
+		m.ClearAccount()
+		return nil
+	case accountuserquotashareusage.EdgeUser:
+		m.ClearUser()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShareUsage unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AccountUserQuotaShareUsageMutation) ResetEdge(name string) error {
+	switch name {
+	case accountuserquotashareusage.EdgeAccount:
+		m.ResetAccount()
+		return nil
+	case accountuserquotashareusage.EdgeUser:
+		m.ResetUser()
+		return nil
+	}
+	return fmt.Errorf("unknown AccountUserQuotaShareUsage edge %s", name)
 }
 
 // AnnouncementMutation represents an operation that mutates the Announcement nodes in the graph.
@@ -48895,6 +51247,12 @@ type UserMutation struct {
 	platform_quotas               map[int64]struct{}
 	removedplatform_quotas        map[int64]struct{}
 	clearedplatform_quotas        bool
+	account_quota_shares          map[int64]struct{}
+	removedaccount_quota_shares   map[int64]struct{}
+	clearedaccount_quota_shares   bool
+	quota_share_usages            map[int64]struct{}
+	removedquota_share_usages     map[int64]struct{}
+	clearedquota_share_usages     bool
 	done                          bool
 	oldValue                      func(context.Context) (*User, error)
 	predicates                    []predicate.User
@@ -50799,6 +53157,114 @@ func (m *UserMutation) ResetPlatformQuotas() {
 	m.removedplatform_quotas = nil
 }
 
+// AddAccountQuotaShareIDs adds the "account_quota_shares" edge to the AccountUserQuotaShare entity by ids.
+func (m *UserMutation) AddAccountQuotaShareIDs(ids ...int64) {
+	if m.account_quota_shares == nil {
+		m.account_quota_shares = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.account_quota_shares[ids[i]] = struct{}{}
+	}
+}
+
+// ClearAccountQuotaShares clears the "account_quota_shares" edge to the AccountUserQuotaShare entity.
+func (m *UserMutation) ClearAccountQuotaShares() {
+	m.clearedaccount_quota_shares = true
+}
+
+// AccountQuotaSharesCleared reports if the "account_quota_shares" edge to the AccountUserQuotaShare entity was cleared.
+func (m *UserMutation) AccountQuotaSharesCleared() bool {
+	return m.clearedaccount_quota_shares
+}
+
+// RemoveAccountQuotaShareIDs removes the "account_quota_shares" edge to the AccountUserQuotaShare entity by IDs.
+func (m *UserMutation) RemoveAccountQuotaShareIDs(ids ...int64) {
+	if m.removedaccount_quota_shares == nil {
+		m.removedaccount_quota_shares = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.account_quota_shares, ids[i])
+		m.removedaccount_quota_shares[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedAccountQuotaShares returns the removed IDs of the "account_quota_shares" edge to the AccountUserQuotaShare entity.
+func (m *UserMutation) RemovedAccountQuotaSharesIDs() (ids []int64) {
+	for id := range m.removedaccount_quota_shares {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// AccountQuotaSharesIDs returns the "account_quota_shares" edge IDs in the mutation.
+func (m *UserMutation) AccountQuotaSharesIDs() (ids []int64) {
+	for id := range m.account_quota_shares {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetAccountQuotaShares resets all changes to the "account_quota_shares" edge.
+func (m *UserMutation) ResetAccountQuotaShares() {
+	m.account_quota_shares = nil
+	m.clearedaccount_quota_shares = false
+	m.removedaccount_quota_shares = nil
+}
+
+// AddQuotaShareUsageIDs adds the "quota_share_usages" edge to the AccountUserQuotaShareUsage entity by ids.
+func (m *UserMutation) AddQuotaShareUsageIDs(ids ...int64) {
+	if m.quota_share_usages == nil {
+		m.quota_share_usages = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.quota_share_usages[ids[i]] = struct{}{}
+	}
+}
+
+// ClearQuotaShareUsages clears the "quota_share_usages" edge to the AccountUserQuotaShareUsage entity.
+func (m *UserMutation) ClearQuotaShareUsages() {
+	m.clearedquota_share_usages = true
+}
+
+// QuotaShareUsagesCleared reports if the "quota_share_usages" edge to the AccountUserQuotaShareUsage entity was cleared.
+func (m *UserMutation) QuotaShareUsagesCleared() bool {
+	return m.clearedquota_share_usages
+}
+
+// RemoveQuotaShareUsageIDs removes the "quota_share_usages" edge to the AccountUserQuotaShareUsage entity by IDs.
+func (m *UserMutation) RemoveQuotaShareUsageIDs(ids ...int64) {
+	if m.removedquota_share_usages == nil {
+		m.removedquota_share_usages = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.quota_share_usages, ids[i])
+		m.removedquota_share_usages[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedQuotaShareUsages returns the removed IDs of the "quota_share_usages" edge to the AccountUserQuotaShareUsage entity.
+func (m *UserMutation) RemovedQuotaShareUsagesIDs() (ids []int64) {
+	for id := range m.removedquota_share_usages {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// QuotaShareUsagesIDs returns the "quota_share_usages" edge IDs in the mutation.
+func (m *UserMutation) QuotaShareUsagesIDs() (ids []int64) {
+	for id := range m.quota_share_usages {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetQuotaShareUsages resets all changes to the "quota_share_usages" edge.
+func (m *UserMutation) ResetQuotaShareUsages() {
+	m.quota_share_usages = nil
+	m.clearedquota_share_usages = false
+	m.removedquota_share_usages = nil
+}
+
 // Where appends a list predicates to the UserMutation builder.
 func (m *UserMutation) Where(ps ...predicate.User) {
 	m.predicates = append(m.predicates, ps...)
@@ -51454,7 +53920,7 @@ func (m *UserMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UserMutation) AddedEdges() []string {
-	edges := make([]string, 0, 13)
+	edges := make([]string, 0, 15)
 	if m.api_keys != nil {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -51493,6 +53959,12 @@ func (m *UserMutation) AddedEdges() []string {
 	}
 	if m.platform_quotas != nil {
 		edges = append(edges, user.EdgePlatformQuotas)
+	}
+	if m.account_quota_shares != nil {
+		edges = append(edges, user.EdgeAccountQuotaShares)
+	}
+	if m.quota_share_usages != nil {
+		edges = append(edges, user.EdgeQuotaShareUsages)
 	}
 	return edges
 }
@@ -51579,13 +54051,25 @@ func (m *UserMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case user.EdgeAccountQuotaShares:
+		ids := make([]ent.Value, 0, len(m.account_quota_shares))
+		for id := range m.account_quota_shares {
+			ids = append(ids, id)
+		}
+		return ids
+	case user.EdgeQuotaShareUsages:
+		ids := make([]ent.Value, 0, len(m.quota_share_usages))
+		for id := range m.quota_share_usages {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UserMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 13)
+	edges := make([]string, 0, 15)
 	if m.removedapi_keys != nil {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -51624,6 +54108,12 @@ func (m *UserMutation) RemovedEdges() []string {
 	}
 	if m.removedplatform_quotas != nil {
 		edges = append(edges, user.EdgePlatformQuotas)
+	}
+	if m.removedaccount_quota_shares != nil {
+		edges = append(edges, user.EdgeAccountQuotaShares)
+	}
+	if m.removedquota_share_usages != nil {
+		edges = append(edges, user.EdgeQuotaShareUsages)
 	}
 	return edges
 }
@@ -51710,13 +54200,25 @@ func (m *UserMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case user.EdgeAccountQuotaShares:
+		ids := make([]ent.Value, 0, len(m.removedaccount_quota_shares))
+		for id := range m.removedaccount_quota_shares {
+			ids = append(ids, id)
+		}
+		return ids
+	case user.EdgeQuotaShareUsages:
+		ids := make([]ent.Value, 0, len(m.removedquota_share_usages))
+		for id := range m.removedquota_share_usages {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UserMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 13)
+	edges := make([]string, 0, 15)
 	if m.clearedapi_keys {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -51756,6 +54258,12 @@ func (m *UserMutation) ClearedEdges() []string {
 	if m.clearedplatform_quotas {
 		edges = append(edges, user.EdgePlatformQuotas)
 	}
+	if m.clearedaccount_quota_shares {
+		edges = append(edges, user.EdgeAccountQuotaShares)
+	}
+	if m.clearedquota_share_usages {
+		edges = append(edges, user.EdgeQuotaShareUsages)
+	}
 	return edges
 }
 
@@ -51789,6 +54297,10 @@ func (m *UserMutation) EdgeCleared(name string) bool {
 		return m.clearedpending_auth_sessions
 	case user.EdgePlatformQuotas:
 		return m.clearedplatform_quotas
+	case user.EdgeAccountQuotaShares:
+		return m.clearedaccount_quota_shares
+	case user.EdgeQuotaShareUsages:
+		return m.clearedquota_share_usages
 	}
 	return false
 }
@@ -51843,6 +54355,12 @@ func (m *UserMutation) ResetEdge(name string) error {
 		return nil
 	case user.EdgePlatformQuotas:
 		m.ResetPlatformQuotas()
+		return nil
+	case user.EdgeAccountQuotaShares:
+		m.ResetAccountQuotaShares()
+		return nil
+	case user.EdgeQuotaShareUsages:
+		m.ResetQuotaShareUsages()
 		return nil
 	}
 	return fmt.Errorf("unknown User edge %s", name)

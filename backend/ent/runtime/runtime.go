@@ -7,6 +7,9 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/accountquotashareusage"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashare"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashareusage"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -274,6 +277,81 @@ func init() {
 	accountgroupDescCreatedAt := accountgroupFields[3].Descriptor()
 	// accountgroup.DefaultCreatedAt holds the default value on creation for the created_at field.
 	accountgroup.DefaultCreatedAt = accountgroupDescCreatedAt.Default.(func() time.Time)
+	accountquotashareusageFields := schema.AccountQuotaShareUsage{}.Fields()
+	_ = accountquotashareusageFields
+	// accountquotashareusageDescWindowKind is the schema descriptor for window_kind field.
+	accountquotashareusageDescWindowKind := accountquotashareusageFields[1].Descriptor()
+	// accountquotashareusage.WindowKindValidator is a validator for the "window_kind" field. It is called by the builders before save.
+	accountquotashareusage.WindowKindValidator = func() func(string) error {
+		validators := accountquotashareusageDescWindowKind.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(window_kind string) error {
+			for _, fn := range fns {
+				if err := fn(window_kind); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// accountquotashareusageDescCost is the schema descriptor for cost field.
+	accountquotashareusageDescCost := accountquotashareusageFields[3].Descriptor()
+	// accountquotashareusage.DefaultCost holds the default value on creation for the cost field.
+	accountquotashareusage.DefaultCost = accountquotashareusageDescCost.Default.(float64)
+	accountuserquotashareMixin := schema.AccountUserQuotaShare{}.Mixin()
+	accountuserquotashareMixinHooks1 := accountuserquotashareMixin[1].Hooks()
+	accountuserquotashare.Hooks[0] = accountuserquotashareMixinHooks1[0]
+	accountuserquotashareMixinInters1 := accountuserquotashareMixin[1].Interceptors()
+	accountuserquotashare.Interceptors[0] = accountuserquotashareMixinInters1[0]
+	accountuserquotashareMixinFields0 := accountuserquotashareMixin[0].Fields()
+	_ = accountuserquotashareMixinFields0
+	accountuserquotashareFields := schema.AccountUserQuotaShare{}.Fields()
+	_ = accountuserquotashareFields
+	// accountuserquotashareDescCreatedAt is the schema descriptor for created_at field.
+	accountuserquotashareDescCreatedAt := accountuserquotashareMixinFields0[0].Descriptor()
+	// accountuserquotashare.DefaultCreatedAt holds the default value on creation for the created_at field.
+	accountuserquotashare.DefaultCreatedAt = accountuserquotashareDescCreatedAt.Default.(func() time.Time)
+	// accountuserquotashareDescUpdatedAt is the schema descriptor for updated_at field.
+	accountuserquotashareDescUpdatedAt := accountuserquotashareMixinFields0[1].Descriptor()
+	// accountuserquotashare.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	accountuserquotashare.DefaultUpdatedAt = accountuserquotashareDescUpdatedAt.Default.(func() time.Time)
+	// accountuserquotashare.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	accountuserquotashare.UpdateDefaultUpdatedAt = accountuserquotashareDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// accountuserquotashareDescFiveHourPercent is the schema descriptor for five_hour_percent field.
+	accountuserquotashareDescFiveHourPercent := accountuserquotashareFields[2].Descriptor()
+	// accountuserquotashare.DefaultFiveHourPercent holds the default value on creation for the five_hour_percent field.
+	accountuserquotashare.DefaultFiveHourPercent = accountuserquotashareDescFiveHourPercent.Default.(float64)
+	// accountuserquotashareDescSevenDayPercent is the schema descriptor for seven_day_percent field.
+	accountuserquotashareDescSevenDayPercent := accountuserquotashareFields[3].Descriptor()
+	// accountuserquotashare.DefaultSevenDayPercent holds the default value on creation for the seven_day_percent field.
+	accountuserquotashare.DefaultSevenDayPercent = accountuserquotashareDescSevenDayPercent.Default.(float64)
+	accountuserquotashareusageFields := schema.AccountUserQuotaShareUsage{}.Fields()
+	_ = accountuserquotashareusageFields
+	// accountuserquotashareusageDescWindowKind is the schema descriptor for window_kind field.
+	accountuserquotashareusageDescWindowKind := accountuserquotashareusageFields[2].Descriptor()
+	// accountuserquotashareusage.WindowKindValidator is a validator for the "window_kind" field. It is called by the builders before save.
+	accountuserquotashareusage.WindowKindValidator = func() func(string) error {
+		validators := accountuserquotashareusageDescWindowKind.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(window_kind string) error {
+			for _, fn := range fns {
+				if err := fn(window_kind); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// accountuserquotashareusageDescCost is the schema descriptor for cost field.
+	accountuserquotashareusageDescCost := accountuserquotashareusageFields[4].Descriptor()
+	// accountuserquotashareusage.DefaultCost holds the default value on creation for the cost field.
+	accountuserquotashareusage.DefaultCost = accountuserquotashareusageDescCost.Default.(float64)
 	announcementFields := schema.Announcement{}.Fields()
 	_ = announcementFields
 	// announcementDescTitle is the schema descriptor for title field.

@@ -432,6 +432,7 @@ func (h *OpenAIGatewayHandler) responsesSingle(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
+	c.Request = c.Request.WithContext(service.WithAccountQuotaShareUserID(c.Request.Context(), subject.UserID))
 	reqLog := requestLogger(
 		c,
 		"handler.openai_gateway.responses",
@@ -1196,6 +1197,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		h.anthropicErrorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
+	c.Request = c.Request.WithContext(service.WithAccountQuotaShareUserID(c.Request.Context(), subject.UserID))
 	reqLog := requestLogger(
 		c,
 		"handler.openai_gateway.messages",
@@ -1349,6 +1351,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			if len(failedAccountIDs) == 0 {
 				if err != nil {
 					cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, currentRoutingModel, reqModel)
+					cls = classifySelectionFailureError(err, cls)
 					if !cls.ModelNotFound {
 						markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 					}
@@ -2344,6 +2347,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
+	c.Request = c.Request.WithContext(service.WithAccountQuotaShareUserID(c.Request.Context(), subject.UserID))
 
 	reqLog := requestLogger(
 		c,

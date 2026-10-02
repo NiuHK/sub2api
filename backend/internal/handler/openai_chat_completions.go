@@ -45,6 +45,7 @@ func (h *OpenAIGatewayHandler) chatCompletionsSingle(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
+	c.Request = c.Request.WithContext(service.WithAccountQuotaShareUserID(c.Request.Context(), subject.UserID))
 	reqLog := requestLogger(
 		c,
 		"handler.openai_gateway.chat_completions",

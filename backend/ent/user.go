@@ -101,11 +101,15 @@ type UserEdges struct {
 	PendingAuthSessions []*PendingAuthSession `json:"pending_auth_sessions,omitempty"`
 	// PlatformQuotas holds the value of the platform_quotas edge.
 	PlatformQuotas []*UserPlatformQuota `json:"platform_quotas,omitempty"`
+	// AccountQuotaShares holds the value of the account_quota_shares edge.
+	AccountQuotaShares []*AccountUserQuotaShare `json:"account_quota_shares,omitempty"`
+	// QuotaShareUsages holds the value of the quota_share_usages edge.
+	QuotaShareUsages []*AccountUserQuotaShareUsage `json:"quota_share_usages,omitempty"`
 	// UserAllowedGroups holds the value of the user_allowed_groups edge.
 	UserAllowedGroups []*UserAllowedGroup `json:"user_allowed_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [14]bool
+	loadedTypes [16]bool
 }
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
@@ -225,10 +229,28 @@ func (e UserEdges) PlatformQuotasOrErr() ([]*UserPlatformQuota, error) {
 	return nil, &NotLoadedError{edge: "platform_quotas"}
 }
 
+// AccountQuotaSharesOrErr returns the AccountQuotaShares value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) AccountQuotaSharesOrErr() ([]*AccountUserQuotaShare, error) {
+	if e.loadedTypes[13] {
+		return e.AccountQuotaShares, nil
+	}
+	return nil, &NotLoadedError{edge: "account_quota_shares"}
+}
+
+// QuotaShareUsagesOrErr returns the QuotaShareUsages value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) QuotaShareUsagesOrErr() ([]*AccountUserQuotaShareUsage, error) {
+	if e.loadedTypes[14] {
+		return e.QuotaShareUsages, nil
+	}
+	return nil, &NotLoadedError{edge: "quota_share_usages"}
+}
+
 // UserAllowedGroupsOrErr returns the UserAllowedGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) UserAllowedGroupsOrErr() ([]*UserAllowedGroup, error) {
-	if e.loadedTypes[13] {
+	if e.loadedTypes[15] {
 		return e.UserAllowedGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "user_allowed_groups"}
@@ -502,6 +524,16 @@ func (_m *User) QueryPendingAuthSessions() *PendingAuthSessionQuery {
 // QueryPlatformQuotas queries the "platform_quotas" edge of the User entity.
 func (_m *User) QueryPlatformQuotas() *UserPlatformQuotaQuery {
 	return NewUserClient(_m.config).QueryPlatformQuotas(_m)
+}
+
+// QueryAccountQuotaShares queries the "account_quota_shares" edge of the User entity.
+func (_m *User) QueryAccountQuotaShares() *AccountUserQuotaShareQuery {
+	return NewUserClient(_m.config).QueryAccountQuotaShares(_m)
+}
+
+// QueryQuotaShareUsages queries the "quota_share_usages" edge of the User entity.
+func (_m *User) QueryQuotaShareUsages() *AccountUserQuotaShareUsageQuery {
+	return NewUserClient(_m.config).QueryQuotaShareUsages(_m)
 }
 
 // QueryUserAllowedGroups queries the "user_allowed_groups" edge of the User entity.

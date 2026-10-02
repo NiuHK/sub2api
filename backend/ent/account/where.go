@@ -1720,6 +1720,75 @@ func HasUsageLogsWith(preds ...predicate.UsageLog) predicate.Account {
 	})
 }
 
+// HasUserQuotaShares applies the HasEdge predicate on the "user_quota_shares" edge.
+func HasUserQuotaShares() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, UserQuotaSharesTable, UserQuotaSharesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasUserQuotaSharesWith applies the HasEdge predicate on the "user_quota_shares" edge with a given conditions (other predicates).
+func HasUserQuotaSharesWith(preds ...predicate.AccountUserQuotaShare) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newUserQuotaSharesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasQuotaShareUsages applies the HasEdge predicate on the "quota_share_usages" edge.
+func HasQuotaShareUsages() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, QuotaShareUsagesTable, QuotaShareUsagesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasQuotaShareUsagesWith applies the HasEdge predicate on the "quota_share_usages" edge with a given conditions (other predicates).
+func HasQuotaShareUsagesWith(preds ...predicate.AccountQuotaShareUsage) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newQuotaShareUsagesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasUserQuotaShareUsages applies the HasEdge predicate on the "user_quota_share_usages" edge.
+func HasUserQuotaShareUsages() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, UserQuotaShareUsagesTable, UserQuotaShareUsagesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasUserQuotaShareUsagesWith applies the HasEdge predicate on the "user_quota_share_usages" edge with a given conditions (other predicates).
+func HasUserQuotaShareUsagesWith(preds ...predicate.AccountUserQuotaShareUsage) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newUserQuotaShareUsagesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasAccountGroups applies the HasEdge predicate on the "account_groups" edge.
 func HasAccountGroups() predicate.Account {
 	return predicate.Account(func(s *sql.Selector) {

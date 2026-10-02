@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -209,6 +210,54 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 		result.QuotaState = quotaState
 	}
 
+	if cmd.CodexShareCost > 0 && strings.EqualFold(cmd.AccountType, service.AccountTypeOAuth) {
+		if err := incrementCodexShareUsage(ctx, tx, cmd); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func incrementCodexShareUsage(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand) error {
+	if cmd == nil || cmd.AccountID <= 0 || cmd.UserID <= 0 || cmd.CodexShareCost <= 0 {
+		return nil
+	}
+	var configured bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM account_user_quota_shares WHERE account_id = $1 AND deleted_at IS NULL)`, cmd.AccountID).Scan(&configured); err != nil {
+		return err
+	}
+	if !configured {
+		return nil
+	}
+	windows := []struct {
+		kind    string
+		resetAt *time.Time
+	}{
+		{kind: "five_hour", resetAt: cmd.CodexShareFiveHourResetAt},
+		{kind: "seven_day", resetAt: cmd.CodexShareSevenDayResetAt},
+	}
+	for _, window := range windows {
+		if window.resetAt == nil {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO account_quota_share_usages (account_id, window_kind, reset_at, cost)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (account_id, window_kind, reset_at)
+			DO UPDATE SET cost = account_quota_share_usages.cost + EXCLUDED.cost
+		`, cmd.AccountID, window.kind, window.resetAt, cmd.CodexShareCost); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO account_user_quota_share_usages (account_id, user_id, window_kind, reset_at, cost)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (account_id, user_id, window_kind, reset_at)
+			DO UPDATE SET cost = account_user_quota_share_usages.cost + EXCLUDED.cost
+		`, cmd.AccountID, cmd.UserID, window.kind, window.resetAt, cmd.CodexShareCost); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

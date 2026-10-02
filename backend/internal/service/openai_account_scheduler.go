@@ -68,6 +68,7 @@ var openAIAdvancedSchedulerSettingCache atomic.Value // *cachedOpenAIAdvancedSch
 var openAIAdvancedSchedulerSettingSF singleflight.Group
 
 type OpenAIAccountScheduleRequest struct {
+	UserID                  int64
 	GroupID                 *int64
 	Platform                string
 	SessionHash             string
@@ -92,6 +93,20 @@ type OpenAIAccountScheduleRequest struct {
 	// and compact_model_mapping; native remote compaction v2 leaves it false.
 	RequireCompact bool
 	ExcludedIDs    map[int64]struct{}
+}
+
+type accountQuotaShareUserIDContextKey struct{}
+
+func WithAccountQuotaShareUserID(ctx context.Context, userID int64) context.Context {
+	return context.WithValue(ctx, accountQuotaShareUserIDContextKey{}, userID)
+}
+
+func accountQuotaShareUserIDFromContext(ctx context.Context) int64 {
+	if ctx == nil {
+		return 0
+	}
+	userID, _ := ctx.Value(accountQuotaShareUserIDContextKey{}).(int64)
+	return userID
 }
 
 type OpenAIAccountScheduleDecision struct {
@@ -383,6 +398,9 @@ func (s *defaultOpenAIAccountScheduler) Select(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
 ) (selection *AccountSelectionResult, decision OpenAIAccountScheduleDecision, err error) {
+	if req.UserID == 0 {
+		req.UserID = accountQuotaShareUserIDFromContext(ctx)
+	}
 	if s != nil && s.service != nil && s.service.openAIGroupRequiresPrivacySet(ctx, req.GroupID) {
 		req.RequirePrivacySet = true
 	}
@@ -415,7 +433,13 @@ func (s *defaultOpenAIAccountScheduler) Select(
 			if hasGroupMetadata && s.service != nil {
 				groupCompatible = s.service.openAIAccountMatchesSchedulingGroup(selection.Account, req.GroupID)
 			}
-			if !groupCompatible ||
+			quotaEligible := true
+			if quotaOK, quotaErr := s.isAccountQuotaShareEligible(ctx, selection.Account, req.UserID); quotaErr != nil {
+				quotaEligible = true
+			} else {
+				quotaEligible = quotaOK
+			}
+			if !groupCompatible || !quotaEligible ||
 				!compatible || !s.isAccountTransportCompatible(selection.Account, req.RequiredTransport) {
 				if selection.ReleaseFunc != nil {
 					selection.ReleaseFunc()
@@ -492,6 +516,17 @@ func (s *defaultOpenAIAccountScheduler) Select(
 	return selection, decision, nil
 }
 
+func (s *defaultOpenAIAccountScheduler) isAccountQuotaShareEligible(ctx context.Context, account *Account, userID int64) (bool, error) {
+	if s == nil || s.service == nil || s.service.accountUserQuotaShareService == nil || account == nil || userID <= 0 || !account.IsOpenAIOAuth() {
+		return true, nil
+	}
+	decision, err := s.service.accountUserQuotaShareService.Evaluate(ctx, account, userID)
+	if err != nil {
+		return true, err
+	}
+	return decision.Eligible, nil
+}
+
 func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
@@ -541,6 +576,10 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 	}
 	account = s.service.recheckSelectedOpenAIAccountFromDB(ctx, account, req.GroupID, req.Platform, req.RequestedModel, req.RequireCompact, req.RequiredCapability)
 	if account == nil || !s.service.openAIAccountMatchesSchedulingGroup(account, req.GroupID) || !s.isAccountRequestCompatible(ctx, account, req) || !s.isAccountTransportCompatible(account, req.RequiredTransport) {
+		clearBinding()
+		return nil, false, nil
+	}
+	if eligible, _ := s.isAccountQuotaShareEligible(ctx, account, req.UserID); !eligible {
 		clearBinding()
 		return nil, false, nil
 	}
@@ -1472,6 +1511,10 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 			filterStats.exclude(reason)
 			continue
 		}
+		if eligible, _ := s.isAccountQuotaShareEligible(ctx, account, req.UserID); !eligible {
+			filterStats.exclude("account_user_quota_share")
+			continue
+		}
 		if !s.isAccountTransportCompatible(account, req.RequiredTransport) {
 			filterStats.exclude("transport_incompatible")
 			continue
@@ -1483,6 +1526,9 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		})
 	}
 	if len(filtered) == 0 {
+		if filterStats.reasons["account_user_quota_share"] > 0 && len(filterStats.reasons) == 1 {
+			return nil, 0, 0, 0, ErrAccountUserQuotaShareExhausted
+		}
 		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false, filterStats.summary(""))
 	}
 
@@ -2284,6 +2330,12 @@ func (s *OpenAIGatewayService) selectLegacyAccountByPreviousResponse(
 		}
 		return nil, false, nil
 	}
+	if eligible, _ := scheduler.isAccountQuotaShareEligible(ctx, account, accountQuotaShareUserIDFromContext(ctx)); !eligible {
+		if selection.ReleaseFunc != nil {
+			selection.ReleaseFunc()
+		}
+		return nil, false, nil
+	}
 	if sessionHash != "" {
 		_ = s.bindOpenAIStickySessionDuringSelection(ctx, groupID, sessionHash, account.ID)
 	}
@@ -2305,6 +2357,7 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 	previousResponseCanMove bool,
 	useUpstreamTokenCost bool,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+	userID := accountQuotaShareUserIDFromContext(ctx)
 	ctx = s.withOpenAIQuotaAutoPauseContext(ctx)
 	ctx = s.withOpenAIGroupPrivacyRequirement(ctx, groupID)
 	// 分组利润控制：唯一文本调度入口的防御性装门。handler 文本
@@ -2341,6 +2394,7 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 			}
 			fallbackScheduler := &defaultOpenAIAccountScheduler{service: s, stats: newOpenAIAccountRuntimeStats()}
 			selection, _, err := fallbackScheduler.selectBySessionHash(ctx, OpenAIAccountScheduleRequest{
+				UserID:                  userID,
 				GroupID:                 groupID,
 				Platform:                platform,
 				SessionHash:             sessionHash,
@@ -2444,6 +2498,7 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 	}
 
 	return scheduler.Select(ctx, OpenAIAccountScheduleRequest{
+		UserID:                  userID,
 		GroupID:                 groupID,
 		Platform:                platform,
 		SessionHash:             sessionHash,

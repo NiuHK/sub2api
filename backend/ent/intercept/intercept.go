@@ -10,6 +10,9 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
+	"github.com/Wei-Shaw/sub2api/ent/accountquotashareusage"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashare"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashareusage"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -185,6 +188,87 @@ func (f TraverseAccountGroup) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.AccountGroupQuery", q)
+}
+
+// The AccountQuotaShareUsageFunc type is an adapter to allow the use of ordinary function as a Querier.
+type AccountQuotaShareUsageFunc func(context.Context, *ent.AccountQuotaShareUsageQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f AccountQuotaShareUsageFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.AccountQuotaShareUsageQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.AccountQuotaShareUsageQuery", q)
+}
+
+// The TraverseAccountQuotaShareUsage type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseAccountQuotaShareUsage func(context.Context, *ent.AccountQuotaShareUsageQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseAccountQuotaShareUsage) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseAccountQuotaShareUsage) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.AccountQuotaShareUsageQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.AccountQuotaShareUsageQuery", q)
+}
+
+// The AccountUserQuotaShareFunc type is an adapter to allow the use of ordinary function as a Querier.
+type AccountUserQuotaShareFunc func(context.Context, *ent.AccountUserQuotaShareQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f AccountUserQuotaShareFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.AccountUserQuotaShareQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.AccountUserQuotaShareQuery", q)
+}
+
+// The TraverseAccountUserQuotaShare type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseAccountUserQuotaShare func(context.Context, *ent.AccountUserQuotaShareQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseAccountUserQuotaShare) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseAccountUserQuotaShare) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.AccountUserQuotaShareQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.AccountUserQuotaShareQuery", q)
+}
+
+// The AccountUserQuotaShareUsageFunc type is an adapter to allow the use of ordinary function as a Querier.
+type AccountUserQuotaShareUsageFunc func(context.Context, *ent.AccountUserQuotaShareUsageQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f AccountUserQuotaShareUsageFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.AccountUserQuotaShareUsageQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.AccountUserQuotaShareUsageQuery", q)
+}
+
+// The TraverseAccountUserQuotaShareUsage type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseAccountUserQuotaShareUsage func(context.Context, *ent.AccountUserQuotaShareUsageQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseAccountUserQuotaShareUsage) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseAccountUserQuotaShareUsage) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.AccountUserQuotaShareUsageQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.AccountUserQuotaShareUsageQuery", q)
 }
 
 // The AnnouncementFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1168,6 +1252,12 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.AccountQuery, predicate.Account, account.OrderOption]{typ: ent.TypeAccount, tq: q}, nil
 	case *ent.AccountGroupQuery:
 		return &query[*ent.AccountGroupQuery, predicate.AccountGroup, accountgroup.OrderOption]{typ: ent.TypeAccountGroup, tq: q}, nil
+	case *ent.AccountQuotaShareUsageQuery:
+		return &query[*ent.AccountQuotaShareUsageQuery, predicate.AccountQuotaShareUsage, accountquotashareusage.OrderOption]{typ: ent.TypeAccountQuotaShareUsage, tq: q}, nil
+	case *ent.AccountUserQuotaShareQuery:
+		return &query[*ent.AccountUserQuotaShareQuery, predicate.AccountUserQuotaShare, accountuserquotashare.OrderOption]{typ: ent.TypeAccountUserQuotaShare, tq: q}, nil
+	case *ent.AccountUserQuotaShareUsageQuery:
+		return &query[*ent.AccountUserQuotaShareUsageQuery, predicate.AccountUserQuotaShareUsage, accountuserquotashareusage.OrderOption]{typ: ent.TypeAccountUserQuotaShareUsage, tq: q}, nil
 	case *ent.AnnouncementQuery:
 		return &query[*ent.AnnouncementQuery, predicate.Announcement, announcement.OrderOption]{typ: ent.TypeAnnouncement, tq: q}, nil
 	case *ent.AnnouncementReadQuery:

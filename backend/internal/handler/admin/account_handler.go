@@ -68,6 +68,13 @@ type AccountHandler struct {
 	ollamaCloudUsage        *service.OllamaCloudUsageService
 	cfg                     *config.Config
 	opencodeGoUsage         *service.OpenCodeGoUsageService
+	accountQuotaShare       service.AccountUserQuotaShareService
+}
+
+// SetAccountUserQuotaShareService attaches the quota-share persistence service
+// without changing the long-standing constructor used by focused tests.
+func (h *AccountHandler) SetAccountUserQuotaShareService(s service.AccountUserQuotaShareService) {
+	h.accountQuotaShare = s
 }
 
 // SetUpstreamBillingProbeService attaches the optional remote billing probe service.
@@ -159,6 +166,19 @@ type UpdateAccountRequest struct {
 	RateSyncEnabled         *bool          `json:"upstream_billing_rate_sync_enabled"`
 	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
+
+// AccountQuotaShare describes the share of an OpenAI OAuth account's quota
+// assigned to one user. A value of -1 means that window is unlimited.
+type AccountQuotaShare struct {
+	UserID          int64   `json:"user_id" binding:"required,gt=0"`
+	FiveHourPercent float64 `json:"five_hour_percent"`
+	SevenDayPercent float64 `json:"seven_day_percent"`
+}
+
+type updateAccountQuotaSharesRequest struct {
+	Shares []AccountQuotaShare `json:"shares"`
+}
+
 
 // BulkUpdateAccountsRequest represents the payload for bulk editing accounts
 type BulkUpdateAccountsRequest struct {

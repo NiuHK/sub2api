@@ -1692,7 +1692,29 @@ export default {
       linkCopied: 'Link Copied',
       needsReauth: 'Re-auth Required',
       rateLimited: 'Rate Limited',
-      usageError: 'Fetch Error'
+      usageError: 'Fetch Error',
+      quotaShares: {
+        menu: 'Quota sharing',
+        title: 'Share account quota',
+        description: 'Assign each bound user a percentage of the five-hour and seven-day windows.',
+        inputHint: 'Enter a percentage from 0 to 100. For example, 50 means 50% of the account window; do not enter 0.5. Use -1 for unlimited.',
+        accountCurrentUsage: 'Current upstream account usage',
+        userColumn: 'User',
+        fiveHourLimit: '5-hour limit (%)',
+        sevenDayLimit: '7-day limit (%)',
+        fiveHourShort: '5h',
+        sevenDayShort: '7d',
+        currentUsage: 'Used',
+        currentUsageUnavailable: 'Used: unavailable',
+        unavailable: 'unavailable',
+        unknownUser: 'Unknown user',
+        emailUnavailable: 'Email unavailable',
+        searchUsers: 'Search users',
+        noUsersFound: 'No matching users',
+        addUser: 'Add user',
+        empty: 'No users selected',
+        saved: 'Quota shares saved'
+      }
     },
 
     // Scheduled Tests

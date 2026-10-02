@@ -12,6 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
+	"github.com/Wei-Shaw/sub2api/ent/accountquotashareusage"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashare"
+	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashareusage"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
@@ -488,6 +491,51 @@ func (_c *AccountCreate) AddUsageLogs(v ...*UsageLog) *AccountCreate {
 	return _c.AddUsageLogIDs(ids...)
 }
 
+// AddUserQuotaShareIDs adds the "user_quota_shares" edge to the AccountUserQuotaShare entity by IDs.
+func (_c *AccountCreate) AddUserQuotaShareIDs(ids ...int64) *AccountCreate {
+	_c.mutation.AddUserQuotaShareIDs(ids...)
+	return _c
+}
+
+// AddUserQuotaShares adds the "user_quota_shares" edges to the AccountUserQuotaShare entity.
+func (_c *AccountCreate) AddUserQuotaShares(v ...*AccountUserQuotaShare) *AccountCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddUserQuotaShareIDs(ids...)
+}
+
+// AddQuotaShareUsageIDs adds the "quota_share_usages" edge to the AccountQuotaShareUsage entity by IDs.
+func (_c *AccountCreate) AddQuotaShareUsageIDs(ids ...int64) *AccountCreate {
+	_c.mutation.AddQuotaShareUsageIDs(ids...)
+	return _c
+}
+
+// AddQuotaShareUsages adds the "quota_share_usages" edges to the AccountQuotaShareUsage entity.
+func (_c *AccountCreate) AddQuotaShareUsages(v ...*AccountQuotaShareUsage) *AccountCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddQuotaShareUsageIDs(ids...)
+}
+
+// AddUserQuotaShareUsageIDs adds the "user_quota_share_usages" edge to the AccountUserQuotaShareUsage entity by IDs.
+func (_c *AccountCreate) AddUserQuotaShareUsageIDs(ids ...int64) *AccountCreate {
+	_c.mutation.AddUserQuotaShareUsageIDs(ids...)
+	return _c
+}
+
+// AddUserQuotaShareUsages adds the "user_quota_share_usages" edges to the AccountUserQuotaShareUsage entity.
+func (_c *AccountCreate) AddUserQuotaShareUsages(v ...*AccountUserQuotaShareUsage) *AccountCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddUserQuotaShareUsageIDs(ids...)
+}
+
 // Mutation returns the AccountMutation object of the builder.
 func (_c *AccountCreate) Mutation() *AccountMutation {
 	return _c.mutation
@@ -880,6 +928,54 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(usagelog.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.UserQuotaSharesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.UserQuotaSharesTable,
+			Columns: []string{account.UserQuotaSharesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashare.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.QuotaShareUsagesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.QuotaShareUsagesTable,
+			Columns: []string{account.QuotaShareUsagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountquotashareusage.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.UserQuotaShareUsagesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.UserQuotaShareUsagesTable,
+			Columns: []string{account.UserQuotaShareUsagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(accountuserquotashareusage.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

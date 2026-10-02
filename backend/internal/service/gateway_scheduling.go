@@ -224,7 +224,22 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	if err != nil {
 		return nil, err
 	}
+	quotaShareBlocked := false
+	if sub2apiUserID > 0 && NormalizeOpenAICompatiblePlatform(platform) == PlatformOpenAI && s.accountUserQuotaShareService != nil {
+		filtered := make([]Account, 0, len(accounts))
+		for i := range accounts {
+			decision, evalErr := s.accountUserQuotaShareService.Evaluate(ctx, &accounts[i], sub2apiUserID)
+			if evalErr != nil || decision.Eligible {
+				filtered = append(filtered, accounts[i])
+			}
+		}
+		quotaShareBlocked = len(accounts) > 0 && len(filtered) == 0
+		accounts = filtered
+	}
 	if len(accounts) == 0 {
+		if quotaShareBlocked {
+			return nil, ErrAccountUserQuotaShareExhausted
+		}
 		return nil, ErrNoAvailableAccounts
 	}
 	ctx = s.withWindowCostPrefetch(ctx, accounts)

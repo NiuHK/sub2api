@@ -15,6 +15,15 @@ type Account func(*sql.Selector)
 // AccountGroup is the predicate function for accountgroup builders.
 type AccountGroup func(*sql.Selector)
 
+// AccountQuotaShareUsage is the predicate function for accountquotashareusage builders.
+type AccountQuotaShareUsage func(*sql.Selector)
+
+// AccountUserQuotaShare is the predicate function for accountuserquotashare builders.
+type AccountUserQuotaShare func(*sql.Selector)
+
+// AccountUserQuotaShareUsage is the predicate function for accountuserquotashareusage builders.
+type AccountUserQuotaShareUsage func(*sql.Selector)
+
 // Announcement is the predicate function for announcement builders.
 type Announcement func(*sql.Selector)
 
