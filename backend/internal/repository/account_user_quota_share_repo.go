@@ -2,24 +2,25 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	entsql "entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/ent/accountquotashareusage"
 	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashare"
-	"github.com/Wei-Shaw/sub2api/ent/accountuserquotashareusage"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
-type accountUserQuotaShareRepository struct{ client *ent.Client }
+type accountUserQuotaShareRepository struct {
+	client *ent.Client
+	sql    sqlExecutor
+}
 
-func NewAccountUserQuotaShareRepository(client *ent.Client) service.AccountUserQuotaShareService {
-	return &accountUserQuotaShareRepository{client: client}
+func NewAccountUserQuotaShareRepository(client *ent.Client, db *sql.DB) service.AccountUserQuotaShareService {
+	return &accountUserQuotaShareRepository{client: client, sql: db}
 }
 
 func (r *accountUserQuotaShareRepository) List(ctx context.Context, userID int64, accountIDs []int64) ([]service.AccountUserQuotaShare, error) {
@@ -57,51 +58,39 @@ func (r *accountUserQuotaShareRepository) GetUsageSnapshot(ctx context.Context, 
 	if accountID <= 0 || (windowKind != "five_hour" && windowKind != "seven_day") {
 		return snapshot, fmt.Errorf("invalid quota share usage lookup")
 	}
+	if resetAt == nil || resetAt.IsZero() {
+		return snapshot, nil
+	}
 	windowDuration := 5 * time.Hour
 	if windowKind == "seven_day" {
 		windowDuration = 7 * 24 * time.Hour
 	}
-	accountQuery := r.client.AccountQuotaShareUsage.Query().Where(
-		accountquotashareusage.AccountIDEQ(accountID),
-		accountquotashareusage.WindowKindEQ(windowKind),
-	)
-	userQuery := r.client.AccountUserQuotaShareUsage.Query().Where(
-		accountuserquotashareusage.AccountIDEQ(accountID),
-		accountuserquotashareusage.WindowKindEQ(windowKind),
-	)
-	anchor := resetAt
-	if anchor == nil {
-		latest, err := accountQuery.Order(accountquotashareusage.ByResetAt(entsql.OrderDesc())).First(ctx)
-		if ent.IsNotFound(err) {
-			return snapshot, nil
-		}
-		if err != nil {
+	if r.sql == nil {
+		return snapshot, fmt.Errorf("quota share usage database unavailable")
+	}
+	from := resetAt.Add(-windowDuration)
+	to := *resetAt
+	rows, err := r.sql.QueryContext(ctx, `
+		SELECT user_id,
+		       COALESCE(SUM(COALESCE(account_stats_cost, total_cost) * COALESCE(account_rate_multiplier, 1)), 0) AS account_cost
+		FROM usage_logs
+		WHERE account_id = $1 AND created_at >= $2 AND created_at < $3
+		GROUP BY user_id`, accountID, from, to)
+	if err != nil {
+		return snapshot, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID int64
+		var cost float64
+		if err := rows.Scan(&userID, &cost); err != nil {
 			return snapshot, err
 		}
-		anchor = &latest.ResetAt
+		snapshot.UserCosts[userID] = cost
+		snapshot.AccountCost += cost
 	}
-	from := anchor.Add(-windowDuration / 2)
-	to := anchor.Add(windowDuration / 2)
-	accountRows, err := accountQuery.
-		Where(accountquotashareusage.ResetAtGTE(from), accountquotashareusage.ResetAtLTE(to)).
-		All(ctx)
-	if err != nil {
+	if err := rows.Err(); err != nil {
 		return snapshot, err
-	}
-	for _, row := range accountRows {
-		snapshot.AccountCost += row.Cost
-	}
-	userRows, err := userQuery.
-		Where(accountuserquotashareusage.ResetAtGTE(from), accountuserquotashareusage.ResetAtLTE(to)).
-		All(ctx)
-	if err != nil {
-		return snapshot, err
-	}
-	for _, row := range userRows {
-		// A window can contain several billing events for the same user. Keep
-		// the same additive semantics as the account aggregate above; assigning
-		// here would leave only whichever row Ent returned last.
-		snapshot.UserCosts[row.UserID] += row.Cost
 	}
 	return snapshot, nil
 }
@@ -198,40 +187,14 @@ func (r *accountUserQuotaShareRepository) Evaluate(ctx context.Context, account 
 		if !ok || usedPercent < 0 {
 			continue
 		}
-		accountUsage, err := r.client.AccountQuotaShareUsage.Query().Where(
-			accountquotashareusage.AccountIDEQ(account.ID),
-			accountquotashareusage.WindowKindEQ(window.kind),
-			accountquotashareusage.ResetAtEQ(resetAt),
-		).Only(ctx)
-		if ent.IsNotFound(err) {
-			continue
-		}
+		snapshot, err := r.GetUsageSnapshot(ctx, account.ID, window.kind, &resetAt)
 		if err != nil {
 			return service.AccountQuotaShareDecision{}, err
 		}
-		userUsage, err := r.client.AccountUserQuotaShareUsage.Query().Where(
-			accountuserquotashareusage.AccountIDEQ(account.ID),
-			accountuserquotashareusage.UserIDEQ(userID),
-			accountuserquotashareusage.WindowKindEQ(window.kind),
-			accountuserquotashareusage.ResetAtEQ(resetAt),
-		).Only(ctx)
-		userCost := float64(0)
-		if ent.IsNotFound(err) {
-			if window.percent > 0 {
-				continue
-			}
-		} else if err == nil {
-			userCost = userUsage.Cost
-		}
-		if err != nil {
-			if !ent.IsNotFound(err) {
-				return service.AccountQuotaShareDecision{}, err
-			}
-		}
-		if accountUsage.Cost <= 0 {
+		if snapshot.AccountCost <= 0 {
 			continue
 		}
-		estimated := usedPercent * userCost / accountUsage.Cost
+		estimated := usedPercent * snapshot.UserCosts[userID] / snapshot.AccountCost
 		if estimated >= window.percent {
 			decision.Eligible = false
 			decision.Known = true
